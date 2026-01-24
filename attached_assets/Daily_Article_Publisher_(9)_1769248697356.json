@@ -1,0 +1,1029 @@
+{
+  "name": "Daily Article Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtDayOfMonth": 13,
+              "triggerAtHour": 23
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        -128
+      ],
+      "id": "c3f4aa93-b602-4b3f-a4f2-4128660e233c",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU",
+          "mode": "list",
+          "cachedResultName": "Контент-план",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Лист1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Дата": "={{ $json[\"Дата\"] }}",
+            "День": "={{ $json[\"День\"] }}",
+            "Тема": "={{ $json[\"Тема\"] }}",
+            "Статус": "={{ $json[\"Статус\"] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Дата",
+              "displayName": "Дата",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "День",
+              "displayName": "День",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Тема",
+              "displayName": "Тема",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Статус",
+              "displayName": "Статус",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1072,
+        -128
+      ],
+      "id": "da6257df-75c3-471d-bfcd-5b8483ab4698",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Gfm53OWJPiDe8dUG",
+          "name": "eGOr-ka Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем текст с темами из предыдущей ноды\nconst inputText = items[0].json.content.parts[0].text;\n\n// Очищаем и парсим текст: удаляем лишние символы, разделяем на строки\nconst topicsArray = inputText\n  .split(/\\\\n|Vафан|\\n/)  // Разделяем по разным разделителям\n  .filter(line => {\n    // Фильтруем только строки, содержащие темы (с двоеточием)\n    const trimmed = line.trim();\n    return trimmed.includes(':') && \n           trimmed.length > 10 && \n           !trimmed.includes('parts') &&\n           !trimmed.includes('text') &&\n           !trimmed.includes('content');\n  })\n  .map(line => {\n    // Очищаем каждую строку\n    return line\n      .replace(/^[^а-яА-Я]*/, '')  // Удаляем не-буквы в начале\n      .replace(/[{}\"\\\\]/g, '')     // Удаляем специальные символы\n      .trim();\n  });\n\n// Создаем массив результатов\nconst results = [];\nconst currentDate = new Date();\n\ntopicsArray.forEach((topic, index) => {\n  // Удаляем \"День X: \" из начала темы\n  const cleanTopic = topic.replace(/^День\\s*\\d+:\\s*/, '');\n  \n  // Создаем дату для каждого дня (текущая дата + индекс дней)\n  const topicDate = new Date(currentDate);\n  topicDate.setDate(currentDate.getDate() + index);\n  \n  results.push({\n    json: {\n      'Дата': topicDate.toISOString().slice(0, 10), // YYYY-MM-DD\n      'День': `День ${index + 1}`,\n      'Тема': cleanTopic, // Используем очищенную тему\n      'Статус': 'новая',\n    }\n  });\n});\n\n// Возвращаем все результаты\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -128
+      ],
+      "id": "19d88b30-c8ec-4d07-a762-c3bbe9dc071e",
+      "name": "Parse Topics",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU",
+          "mode": "list",
+          "cachedResultName": "Контент-план",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Лист1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        192,
+        -128
+      ],
+      "id": "aeb1b904-6711-4d29-a4da-8e59bfb3ee05",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Gfm53OWJPiDe8dUG",
+          "name": "eGOr-ka Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Все строки из Google Sheets\nconst itemsFromSheets = items;\n\nlet startIndex = 0;\n\nif (itemsFromSheets.length > 0) {\n  const lastItem = itemsFromSheets[itemsFromSheets.length - 1];\n  const dayValue = lastItem.json['День'];\n\n  if (typeof dayValue === 'string') {\n    const match = dayValue.match(/\\d+/);\n    if (match) {\n      startIndex = parseInt(match[0], 10);\n    }\n  }\n}\n\n// ОБЯЗАТЕЛЬНО вернуть item\nreturn [\n  {\n    json: {\n      startIndex\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -128
+      ],
+      "id": "b49d7aac-23bf-479c-b3f8-4c7a0fb0ca92",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "content": "## Генерация тем (30 шт)",
+        "height": 368,
+        "width": 1312
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -96,
+        -208
+      ],
+      "typeVersion": 1,
+      "id": "1a0e816b-46f7-4fd7-be8d-44ad46a6505f",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU",
+          "mode": "list",
+          "cachedResultName": "Контент-план",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Лист1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Статус",
+              "lookupValue": "новая"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get New Topic",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        192,
+        224
+      ],
+      "id": "2f5c2bc3-7e43-4de5-9e4d-935f5d704a19",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Gfm53OWJPiDe8dUG",
+          "name": "eGOr-ka Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const topic = $input.all()[0]?.json?.[\"Тема\"];\n\nreturn {\n  json: {\n    prompt: `Ты — эксперт по автоматизации бизнес-процессов и AI в России.\n\n(Правила оформления статьи (## [Заголовок статьи]\n[Вводный абзац — 2-3 предложения, описывающие проблему или контекст]\n**[Ключевой тезис или hook]**\n[Абзац, раскрывающий проблему подробнее]\n## [Раздел 1: Название]\n[Текст раздела]\n- Пункт маркированного списка (в маркированных списках между пунктами не делай разделение в виде пустой строки, пусть пункты идут друг за другом)\n- Пункт маркированного списка\n- Пункт маркированного списка\n[Заключительный абзац раздела]\n## [Раздел 2: Название]\n[Описание задачи или проблемы]\n**Задача:** [краткое описание]\n**Решение:**\n1. Первый шаг\n2. Второй шаг\n3. Третий шаг\n[Результат или вывод]\n## [Раздел 3: Практический пример]\n> [Цитата или важная мысль в блоке]\n[Описание кейса или примера]\n## Заключение\n[2-3 абзаца с выводами и призывом к действию]\nПравила форматирования:\nЗаголовки:\n\nГлавный заголовок: ## Заголовок статьи (H2)\nПодзаголовки разделов: ## Название раздела (H2)\nПодподзаголовки: ### Подраздел (H3)\nЖирный текст:\n\nИспользуй **текст** для выделения ключевых терминов\nВыделяй: названия инструментов, важные понятия, метки \"Задача:\", \"Решение:\", \"Результат:\"\nСписки:\n\nМаркированные: начинай с - (дефис + пробел)\nНумерованные: 1., 2., 3. (для пошаговых инструкций)\nЦитаты/блоки:\n\nИспользуй > текст для важных выводов или цитат\nАбзацы:\n\nРазделяй абзацы пустой строкой\nКаждый абзац — 2-4 предложения\nИзбегай стен текста\nДлина статьи:\n\n1500-2500 слов\n5-8 разделов\nВремя чтения: 6-12 минут))\n    \nНапиши аналитическую статью на тему:\n\"${topic}\"\nДполнение (после того, как сгенерируешь статью, следуй дальнейшим инструкциям) - Отредактируй созданный текст:\n\n1. Убери повторы — одна мысль = одно предложение\n2. Замени абстрактное на конкретное (\"быстро\" → \"за 2 минуты\")\n3. Активный залог вместо пассивного (\"было сделано\" → \"сделал\")\n\nНе меняй: основной посыл, тон, ключевые факты.\nДополнительная проверка текста: после создания статьи проверь, чтобы в тексте не было символов из других языков (кроме русского, на котором должна быть написана статья, допускаются английские символы, если в тексте необходимо было упомнуть термины на английском). Пример недопустимых символов - 提高. Также (строго), проверь текст на смысловую, синтаксическую и пунктуационную верность, согласно правилам русского языка`,\n    topic,\n    row_number: $input.all()[0]?.json?.row_number\n  }\n};\n"
+      },
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        224
+      ],
+      "id": "9354399f-48bd-4fe7-a00c-b2833e508d00"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tekflow.pro/api/articles",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "article",
+              "value": "={{$json[\"article\"]}}"
+            },
+            {
+              "name": "topic",
+              "value": "={{$json[\"topic\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Publish to Site",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1264,
+        240
+      ],
+      "id": "38bea051-5e6b-493e-9d18-e0018f2bca30",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "mX5jaTkq4Epd1RL6",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU",
+          "mode": "list",
+          "cachedResultName": "Контент-план",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Лист1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xWx2r7B_7sK9BtsmnM7RkmlE-T1EVwGOC0qKG55ZZpU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Статус": "опубликовано",
+            "row_number": "={{ $('Get New Topic').item.json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Дата",
+              "displayName": "Дата",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "День",
+              "displayName": "День",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Тема",
+              "displayName": "Тема",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Статус",
+              "displayName": "Статус",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Update Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1424,
+        240
+      ],
+      "id": "32512090-7afc-495b-90c1-5658b35db7cf",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Gfm53OWJPiDe8dUG",
+          "name": "eGOr-ka Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        224
+      ],
+      "id": "f463d39d-bbc6-4d7c-a986-4a99996ae702",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        896,
+        240
+      ],
+      "id": "5a052ff5-9faf-43de-b2d8-966dd3e6955c",
+      "name": "Merge",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const json = $json;\n\nconst articleText = $input.first().json.output || '';\n\nreturn {\n  json: {\n    topic: json.topic,\n    row_number: json.row_number,\n    article: articleText,\n  },\n};\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        240
+      ],
+      "id": "051a3e98-bf0e-4a12-81ee-11d4f24ba47d",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "chatId": "@tekflow_ai",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1552,
+        480
+      ],
+      "id": "9fc5a92f-596e-4989-88d4-d94fbb332ef9",
+      "name": "Send a text message",
+      "webhookId": "7dbb0f7a-e377-4e6e-9442-7a5ec3f059ba",
+      "credentials": {
+        "telegramApi": {
+          "id": "utRQRkdWIUT6zyMe",
+          "name": "BOT (AI-sales)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Генерация статей",
+        "height": 512,
+        "width": 1312,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -96,
+        176
+      ],
+      "typeVersion": 1,
+      "id": "37fa3084-55ec-4cb0-857e-35e002838eae",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Сайт",
+        "height": 224,
+        "width": 576,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1232,
+        176
+      ],
+      "typeVersion": 1,
+      "id": "6b3938ed-43e1-4774-bf69-9dcc64a220bb",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        592,
+        336
+      ],
+      "id": "7ca1bd5f-bd5c-45a4-862e-2be20ad1a254",
+      "name": "Генерация статьи"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты — редактор Telegram-канала про автоматизацию бизнеса и AI.\n\nНа входе — полноценная статья.\nТвоя задача — адаптировать её для Telegram-поста.\n\nТРЕБОВАНИЯ:\nСформируй текст строго в HTML для Telegram:\n- <b>жирный</b>\n- <i>курсив</i>\n- <u>подчёркивание</u>\n- <code>код</code>\n- <blockquote>цитата</blockquote>\n- Используй эмодзи для смысловых блоков\n- Никакого Markdown\n- Никаких ###\n- Делай короткие абзацы (1–3 строки)\n- Используй списки через тире —\n- Используй нумерацию ТОЛЬКО такими символами: \n🔸 Первый пункт\n🔸 Второй пункт и тд.\nНЕ используй 1️⃣ 2️⃣ 3️⃣\nНЕ используй обычные цифры с точкой\n- Стиль: живой, экспертный, без академизма\n- Объём: 1 пост (не лонгрид)\n- Форматируй текст ТОЛЬКО для Telegram HTML.\n- НЕ используй <br>, <p>, <div>.\n- Переносы строк делай только через пустые строки.\n- Разрешены только теги: <b>, <i>, <u>, <code>.\n\nНЕ пиши:\n- «Введение»\n- «Заключение»\n- служебные слова\n\nВерни ТОЛЬКО готовый текст поста, без пояснений.\n\n\n\nТекст статьи возьми отсюда ({{ $json.article }})",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1264,
+        480
+      ],
+      "id": "a2098e39-622a-4586-9f7f-fa840a12b779",
+      "name": "Редактирование под ТГ"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4o-mini",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        592,
+        560
+      ],
+      "id": "b059eda3-7efc-4755-838d-92598bb12d77",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "U5jyQ3LOrGaTDwev",
+          "name": "OpenRouter TekFlow"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4o-mini",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        576,
+        48
+      ],
+      "id": "5c3e0ccf-1185-432d-9d5c-8c8ee64bdaa1",
+      "name": "OpenRouter Chat Model1",
+      "credentials": {
+        "openRouterApi": {
+          "id": "U5jyQ3LOrGaTDwev",
+          "name": "OpenRouter TekFlow"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Ты — стратег по контенту и аналитик рынка автоматизации бизнес-процессов в России.\n\nЗадача:\nВ начале каждого месяца сформировать контент-план из 30 тем статей\nдля ниши «автоматизация бизнес-процессов»,\nактуальных для рынка РФ на 2026 год.\n\nКонтекст и требования:\n— Целевая аудитория: собственники бизнеса, операционные директора, руководители digital/IT, интеграторы\n— Фокус: практическая автоматизация, AI-агенты, no-code / low-code, гиперавтоматизация, импортозамещение\n— Избегай банальных и общих формулировок\n— Темы должны отражать тренды, бизнес-боль, экономический эффект и управленческие решения\n— Формулировки — короткие, ёмкие, без воды (как заголовки статей)\n\nОриентиры по стилю и глубине (примеры прошлых материалов):\n— no-code / low-code как стандарт для бизнеса\n— автоматизация в контексте импортозамещения и экосистем российских сервисов\n— AI-ассистенты и AI-агенты как новый уровень автоматизации, а не просто «роботы для рутины»\n\nФормат ответа (СТРОГО, без комментариев, без вступлений):\nДень 1: [краткая тема]\nДень 2: [краткая тема]\nДень 3: [краткая тема]\n…\nДень 30: [краткая тема]\n\nДополнительно:\n— 30–40% тем должны затрагивать AI-агентов и ИИ внутри бизнес-процессов\n— 20–30% — импортозамещение и российский стек\n— Остальное — масштабирование, контроль, аналитика, снижение издержек",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        576,
+        -128
+      ],
+      "id": "fc887909-f07c-40ec-8905-961132b729d8",
+      "name": "Генерация тем2"
+    },
+    {
+      "parameters": {
+        "content": "## ТГ",
+        "height": 224,
+        "width": 576,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1232,
+        416
+      ],
+      "typeVersion": 1,
+      "id": "5330ed21-e71f-4ec1-8b7b-bfb46803ca8e",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## VK ",
+        "height": 224,
+        "width": 736,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1232,
+        656
+      ],
+      "typeVersion": 1,
+      "id": "9a351fe9-8cc7-4aa8-9fbb-060c2b6e8bc6",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.output;\n\n// Удаляем ВСЕ HTML-теги\nconst cleanText = html\n  .replace(/<br\\s*\\/?>/gi, '\\n')\n  .replace(/<\\/p>/gi, '\\n')\n  .replace(/<[^>]+>/g, '')\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\n\nif (cleanText.length > 3800) {\n  cleanText = cleanText.slice(0, 3800) + '…';\n}\n\nreturn {\n  json: {\n    text: cleanText\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        720
+      ],
+      "id": "bc6ebc4c-e0d2-4a53-9420-cef57aaa5f7c",
+      "name": "Prepare VK Post"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vk.com/method/wall.post",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner_id",
+              "value": "-235397481"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "access_token",
+              "value": "vk1.a._4FZgEpebv197wM7M9Iw27z2y5527JncsWgmux0ZahZ7SylgzxUEQonoHlZjtTDHoEJR746eDdholnyiPBAT9Xw5_TUmsK9zF6M69ED7-Nc0eBAibHdANS9PpHE4ATcB7inNOa1c6FES27I99ZlRIqArpzjOIRoiyQJzsatfYaEruCK6_ZPaAOOEvSmzqV8VWkq3oyznTAXDK2V_8qVErA"
+            },
+            {
+              "name": "v",
+              "value": "5.199"
+            },
+            {
+              "name": "from_group",
+              "value": "1"
+            },
+            {
+              "name": "publish_date",
+              "value": "0"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1728,
+        720
+      ],
+      "id": "1745c8a8-16c6-4f9b-abe7-f48a8fadb99b",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0dddf554-d3e2-4521-bec4-fb6ed39a66de",
+              "name": "urls.full",
+              "value": "={{ $json.urls.full }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        608,
+        784
+      ],
+      "id": "2b964137-d341-4832-bdf3-290fbebe1a12",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "url": "https://api.unsplash.com/photos/random",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "technology"
+            },
+            {
+              "name": "orientation",
+              "value": "landscape"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Client-ID b4E1W4zRAaoRJIuiH_es0J6maSYn_eu0JWxd1Aembio"
+            },
+            {
+              "name": "Accept-Version",
+              "value": "v1"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        784
+      ],
+      "id": "b6d6e9ba-91ab-4d27-9d18-a965939a559f",
+      "name": "Ссылка на картинку"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.urls.full }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        768,
+        784
+      ],
+      "id": "7136b6f5-975c-4645-a98c-d561dfeb310b",
+      "name": "Файл картинки"
+    },
+    {
+      "parameters": {
+        "content": "## Получение картинки",
+        "height": 512,
+        "width": 832
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        384,
+        704
+      ],
+      "id": "36e9037d-7d54-48a6-92e8-8ee0fd8bbfe2",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "## Link",
+        "height": 224,
+        "width": 736,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1232,
+        896
+      ],
+      "typeVersion": 1,
+      "id": "2bb6a5ff-cd3d-492e-bae7-023ed5c6b1c4",
+      "name": "Sticky Note7"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Topics": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Генерация тем2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get New Topic": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to Site": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get New Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Генерация статьи",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Publish to Site",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Редактирование под ТГ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        []
+      ]
+    },
+    "Генерация статьи": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Редактирование под ТГ": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare VK Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Генерация статьи",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Редактирование под ТГ",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Генерация тем2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Генерация тем2": {
+      "main": [
+        [
+          {
+            "node": "Parse Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare VK Post": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Файл картинки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ссылка на картинку": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timeSavedMode": "fixed",
+    "timezone": "Europe/Moscow",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "5e39d7e9-9011-4527-9ca8-ecc6364d5863",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "989034efe60a5704054e210cfbd35c2cff87ae4e6af280639b41f0ade14b6949"
+  },
+  "id": "xAY97RdpWGzPi2H0",
+  "tags": []
+}
