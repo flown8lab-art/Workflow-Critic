@@ -1,0 +1,538 @@
+{
+  "name": "Lead_vc.ru",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "90a826b6-552b-46a0-ad5c-820a11cbf8a6",
+              "name": "source",
+              "value": "zen",
+              "type": "string"
+            },
+            {
+              "id": "d2cf235f-ef9b-4d18-8d8d-63f4606a912e",
+              "name": "purpose",
+              "value": "find_business_pain",
+              "type": "string"
+            },
+            {
+              "id": "5443aaf9-1d09-41ca-b269-63f2ddee598a",
+              "name": "version",
+              "value": "v1",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -16,
+        -112
+      ],
+      "id": "d022eaee-4a95-4e46-a4d0-bfe3f7336df8",
+      "name": "Edit Fields1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "https://example.com",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        192,
+        -112
+      ],
+      "id": "5160255e-0fa5-41a1-a8bf-9debcb4a2720",
+      "name": "HTTP Request1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4o-mini",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        592,
+        416
+      ],
+      "id": "4d1e972b-8331-44c4-b93d-7f16d50af176",
+      "name": "OpenRouter Chat Model1",
+      "credentials": {
+        "openRouterApi": {
+          "id": "U5jyQ3LOrGaTDwev",
+          "name": "OpenRouter TekFlow"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты анализируешь статьи для B2B-лидогенерации.\n\nЗадача:\nОпределить, есть ли в статье бизнес-боль, управленческая проблема или ситуация,\nгде владелец бизнеса, руководитель или эксперт может узнать себя\nи вступить в обсуждение.\n\nНЕ считаются бизнес-болью:\n- просто новости\n- политика\n- конфликты корпораций\n- хайп\n- суды без прикладного контекста\n\nВерни ответ строго в JSON:\n{\n  \"isRelevant\": true | false,\n  \"reason\": \"кратко почему\",\n  \"possibleAngle\": \"если релевантно — с какой стороны можно вступить в диалог, иначе пусто\",\n  \"link\": {{ $json.original_link }}\n} ",
+        "options": {
+          "systemMessage": "=Заголовок: {{ $json.json.title }}\n\nКраткое описание:\n{{ $json.json.contentSnippet }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        592,
+        80
+      ],
+      "id": "a9a08d7a-3f7d-46b6-9f79-1c5fa0c39c6a",
+      "name": "Анализ статей"
+    },
+    {
+      "parameters": {
+        "url": "https://vc.ru/rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        -112
+      ],
+      "id": "49472b80-88d9-4350-adce-f83fa6eb0bd6",
+      "name": "RSS Read (vc.ru)"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты пишешь комментарий как живой предприниматель, а не как эксперт или аналитик.\n\nСтиль:\n— разговорный\n— короткие фразы\n— без вводных вроде «статья рассматривает», «важный аспект», «следует отметить»\n— без канцелярита и академичности\n\nКак будто ты:\n— читаешь статью\n— делишься наблюдением из практики\n— пишешь 1 комментарий в ленте\n\nЗапрещено:\n— пересказывать статью\n— писать обобщённо\n— звучать как ИИ, консультант или автор колонки\n\nВерни ответ (строго):\n{\n\"output\": \"Твой сгенерированный комментарий\"\n\"link\": {{ $json.parsed.link }} \n}",
+        "options": {
+          "systemMessage": "=Напиши комментарий под бизнес-статьёй.\n\nКонтекст:\n{{ $json.parsed.possibleAngle }}\n\nТребования:\n— 2–4 предложения\n— без пересказа статьи\n— как будто пишешь от себя, из опыта\n— допускается лёгкий скепсис или ирония\n— в конце один простой вопрос, как в живом диалоге\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1104,
+        304
+      ],
+      "id": "f0ef8971-c684-446c-8041-a7be2f05f579",
+      "name": "Создание комментария"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1bNTlQT2orL87RpV34G7B-M8hoSK-sVIKeyf4UFozM8I",
+          "mode": "list",
+          "cachedResultName": "Lead_gen",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bNTlQT2orL87RpV34G7B-M8hoSK-sVIKeyf4UFozM8I/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Лист1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bNTlQT2orL87RpV34G7B-M8hoSK-sVIKeyf4UFozM8I/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Comment": "={{ $json.comment }}",
+            "Link": "={{ $json.link }}",
+            "Status": "новая"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Link",
+              "displayName": "Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Comment",
+              "displayName": "Comment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1760,
+        304
+      ],
+      "id": "298c6b32-e82b-45bd-a2a3-e1192ca0711a",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Gfm53OWJPiDe8dUG",
+          "name": "eGOr-ka Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "72ff6024-76bc-4f06-a4aa-d213a21b7be0",
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "бизнес|компан|выручк|продаж|клиент|заказ|поставк|производств|проект|сервис|рынок|рост|команд|процесс|операц|масштаб|эффектив|автоматиз|бот|ai|ии|нейросет|gpt|чат-бот|chatbot|оптимиз|сокращ|затрат|экономи|расход|бюджет|hr|кадр|найм|рекрутинг|персонал|сотрудник|аутсорс|аутстафф|делегир|crm|erp|интеграц|workflow|воронк|лид|конверс|kpi|метрик|аналитик|дашборд|отчёт|рутин|ручн|менеджер|отдел|департамент",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        592,
+        -112
+      ],
+      "id": "3612a2d4-8976-4b6d-bd93-a3559d75bacf",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e2100cb0-2d17-4d09-a5a9-dcce515a7c54",
+              "leftValue": "={{ $json.parsed.isRelevant }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1104,
+        80
+      ],
+      "id": "979e3384-2fb7-4cc3-9f54-298aa2295c1c",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -224,
+        -112
+      ],
+      "id": "a7b6dfeb-1a1b-4f6d-9760-d1caf9ac1379",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fbe7a076-2673-45ef-9384-0f687430c500",
+              "name": "original_link",
+              "value": "={{ $json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "c6c548e4-9bdf-4021-af51-a634ab0a5eb2",
+              "name": "json.title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "8bd8f7aa-aa74-41a5-a001-ffbc38786e40",
+              "name": "json.contentSnippet",
+              "value": "={{ $json.contentSnippet }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        -128
+      ],
+      "id": "1167ad62-85a6-4991-8981-e80fa7c74be7",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $input.first().json.output;\n\n// 1. Если AI уже вернул объект — используем его сразу\nif (typeof raw === 'object') {\n  return [\n    {\n      ...$json,\n      parsed: raw\n    }\n  ];\n}\n\n// 2. Если строка — чистим и парсим\nif (typeof raw === 'string') {\n  let cleaned = raw\n    .replace(/```json/g, '')\n    .replace(/```/g, '')\n    .trim();\n\n  let parsed;\n  try {\n    parsed = JSON.parse(cleaned);\n  } catch (e) {\n    throw new Error('JSON.parse failed. RAW:\\n' + cleaned);\n  }\n\n  return [\n    {\n      ...$json,\n      parsed\n    }\n  ];\n}\n\n// 3. Всё остальное — ошибка\nthrow new Error('Неподдерживаемый формат поля ai');\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        80
+      ],
+      "id": "59a8060c-aa46-48e3-8765-e1c0cf2062a4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $input.first().json.output;\n\n// 1. Если AI уже вернул объект — используем его сразу\nif (typeof raw === 'object') {\n  return [\n    {\n      ...$json,\n      parsed: raw\n    }\n  ];\n}\n\n// 2. Если строка — чистим и парсим\nif (typeof raw === 'string') {\n  let cleaned = raw\n    .replace(/```json/g, '')\n    .replace(/```/g, '')\n    .trim();\n\n  let parsed;\n  try {\n    parsed = JSON.parse(cleaned);\n  } catch (e) {\n    throw new Error('JSON.parse failed. RAW:\\n' + cleaned);\n  }\n\n  return [\n    {\n      ...$json,\n      parsed\n    }\n  ];\n}\n\n// 3. Всё остальное — ошибка\nthrow new Error('Неподдерживаемый формат поля ai');\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        304
+      ],
+      "id": "2a05cd08-3f1c-4940-9a0b-607d1bae7957",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b350ec21-bc32-4703-bd30-97f2e7863a6d",
+              "name": "link",
+              "value": "={{ $json.parsed.link }}",
+              "type": "string"
+            },
+            {
+              "id": "0640d0e0-da70-44e6-8af9-7693738fd90d",
+              "name": "comment",
+              "value": "={{ $json.parsed.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1584,
+        304
+      ],
+      "id": "f747763a-cffa-4b51-89d9-045eeca9802c",
+      "name": "Edit Fields2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "RSS Read (vc.ru)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Анализ статей",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Создание комментария",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Анализ статей": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read (vc.ru)": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создание комментария": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Создание комментария",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Анализ статей",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "db9d5f17-bdf0-4ca6-87b0-7b0a27fc8922",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "989034efe60a5704054e210cfbd35c2cff87ae4e6af280639b41f0ade14b6949"
+  },
+  "id": "oj8oI71qHnopSJBa",
+  "tags": []
+}
