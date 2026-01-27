@@ -1,0 +1,75 @@
+{
+  "name": "Test_1",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b68aa0f9-5d5b-42b8-b0e5-a4d799eefebd",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://carcraft96.ru/wp-json/wp/v2/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"title\": \"Заголовок новости на сегодня\",\n  \"content\": \"<p>HTML/текст новости, который тебе сгенерировал другой узел n8n</p>\",\n  \"status\": \"publish\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "cdb03afa-b2bf-42d5-b5ec-f33941e21be6",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "sSwlkcMz4Ne9ptUx",
+          "name": "CarCraft"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "37d8d4d8-dfa7-4989-91c6-54745b268fcb",
+  "meta": {
+    "instanceId": "989034efe60a5704054e210cfbd35c2cff87ae4e6af280639b41f0ade14b6949"
+  },
+  "id": "9Krj6Z9gO1M38UAN",
+  "tags": []
+}
