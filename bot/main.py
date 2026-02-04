@@ -449,8 +449,13 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         seen = set()
         unique_vacancies = []
+        exclude_keywords = ['менеджер по продажам', 'sales manager', 'менеджер продаж', 
+                           'торговый представитель', 'продавец-консультант', 'продавец']
         for vac in vacancies:
-            key = (vac.get('name', '').lower(), vac.get('employer', {}).get('name', '').lower())
+            name_lower = vac.get('name', '').lower()
+            if any(excl in name_lower for excl in exclude_keywords):
+                continue
+            key = (name_lower, vac.get('employer', {}).get('name', '').lower())
             if key not in seen:
                 seen.add(key)
                 unique_vacancies.append(vac)
