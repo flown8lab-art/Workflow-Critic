@@ -1,0 +1,122 @@
+@javascript_jobs (JavaScript / frontend вакансии)
+​
+
+@forwebjob (For Web — фронтенд, дизайн, программирование)
+​
+
+@frontend_job_offers (Front-end Job Offers)
+​
+
+@qa_jobs_ru (QA — вакансии тестировщиков)
+​
+
+@analyst_jobs_ru (Вакансии аналитиков, Data Analyst и Scientist)
+​
+
+@it_analytics_jobs (Работа для бизнес/системных и data аналитиков)
+​
+
+@designers_jobs (Вакансии дизайнеров UX/UI/web)
+​
+
+@uiux_jobs (UI/UX Jobs)
+​
+
+@rabota_dizajnera (Работа для дизайнера)
+​
+
+@vakansii_dlja_dizajnerov (Вакансии для дизайнеров)
+​
+
+@go_careers (Go Careers — internships & jobs)
+​
+
+@jobsinternshipswale (Jobs Internships Wale)
+​
+
+@offcampus_phodenge (OffCampus Phodenge)
+​
+
+@riddhi_dutta (Job Updates & Tutorials)
+​
+
+@findITJobsLink (Find IT Jobs)
+​
+
+@akashthedeveloper (Akash the Developer — jobs & internships)
+​
+
+@Hub_Jobs (Hub Jobs / хаб вакансий)
+​
+
+@Remote_Jobs_Channel (Remote Jobs — EN, общие удалённые)
+
+@Relocation_Jobs (Relocation Jobs)
+​
+
+@it_jobs_ru (IT вакансии, Россия)
+
+@backend_jobs_ru (Backend вакансии)
+​
+
+@frontend_jobs_ru (Frontend вакансии)
+​
+
+@fullstack_jobs_ru (Fullstack вакансии)
+​
+
+@java_jobs_ru (Java вакансии)
+​
+
+@python_jobs_ru (Python вакансии)
+​
+
+@dotnet_jobs_ru (.NET вакансии)
+​
+
+@mobile_jobs_ru (Мобильная разработка)
+​
+
+@gamedev_jobs_ru (Геймдев)
+​
+
+@devops_sre_jobs (DevOps/SRE вакансии)
+​
+
+@data_science_jobs_ru (Data Science / ML вакансии)
+​
+
+@productmanagers_jobs (Product менеджеры)
+​
+
+@pm_jobs_ru (Project / Product менеджеры)
+​
+
+@marketing_jobs_ru (Маркетинг и digital)
+​
+
+@smm_jobs_ru (SMM вакансии)
+​
+
+@copywriting_jobs_ru (Копирайт/контент)
+​
+
+@ux_ui_jobs_ru (UX/UI вакансии)
+​
+
+@therecruitmenthub (Recruitment Hub — EN, общие вакансии)
+​
+
+@jobs_usa_uk (JOBS IN USA & UK)
+​
+
+@india_jobs_channel (INDIA JOBS)
+​
+
+@usa_jobs_channel (USA Jobs)
+​
+
+@digital_marketing_jobs (Digital Marketing Jobs)
+​
+
+@it_freelancer_outsourcing (IT Freelancer & Outsourcing)
