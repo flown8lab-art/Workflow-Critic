@@ -532,47 +532,91 @@ async def vacancy_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     
     vacancy = vacancies[vacancy_index]
+    source = vacancy.get('source', 'hh')
     
     await query.edit_message_text("Загружаю детали вакансии...")
     
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{HH_API_URL}/vacancies/{vacancy['id']}",
-                headers=HEADERS,
-                timeout=aiohttp.ClientTimeout(total=15)
-            ) as response:
-                if response.status != 200:
-                    raise Exception(f"HTTP {response.status}")
-                vacancy_details = await response.json()
-        
-        description = vacancy_details.get('description', '')
-        from html import unescape
-        import re
-        description = re.sub(r'<[^>]+>', ' ', description)
-        description = unescape(description)
-        description = ' '.join(description.split())[:800]
-        
-        salary_text = "Не указана"
-        if vacancy_details.get('salary'):
-            sal = vacancy_details['salary']
-            if sal.get('from') and sal.get('to'):
-                salary_text = f"{sal['from']:,} - {sal['to']:,} {sal.get('currency', '')}"
-            elif sal.get('from'):
-                salary_text = f"от {sal['from']:,} {sal.get('currency', '')}"
-            elif sal.get('to'):
-                salary_text = f"до {sal['to']:,} {sal.get('currency', '')}"
-        
-        vacancy_info = (
-            f"**{vacancy_details['name']}**\n\n"
-            f"Компания: {vacancy_details.get('employer', {}).get('name', 'Не указано')}\n"
-            f"Зарплата: {salary_text}\n"
-            f"Город: {vacancy_details.get('area', {}).get('name', 'Не указано')}\n"
-            f"Опыт: {vacancy_details.get('experience', {}).get('name', 'Не указано')}\n"
-            f"Занятость: {vacancy_details.get('schedule', {}).get('name', 'Не указано')}\n\n"
-            f"Описание:\n{description}...\n\n"
-            f"Ссылка: {vacancy_details.get('alternate_url', '')}"
-        )
+        if source == 'telegram':
+            vacancy_details = vacancy
+            description = vacancy.get('full_text', vacancy.get('name', ''))[:800]
+            
+            salary_text = "Не указана"
+            if vacancy.get('salary'):
+                sal = vacancy['salary']
+                if sal.get('from') and sal.get('to'):
+                    salary_text = f"{sal['from']:,} - {sal['to']:,} руб."
+                elif sal.get('from'):
+                    salary_text = f"от {sal['from']:,} руб."
+                elif sal.get('to'):
+                    salary_text = f"до {sal['to']:,} руб."
+            
+            vacancy_info = (
+                f"📱 **{vacancy.get('name', 'Вакансия')}**\n\n"
+                f"Компания: {vacancy.get('employer', {}).get('name', 'Не указано')}\n"
+                f"Зарплата: {salary_text}\n"
+                f"Тип: {vacancy.get('work_type', 'Не указано')}\n"
+                f"Канал: {vacancy.get('channel', '')}\n\n"
+                f"Описание:\n{description}\n\n"
+                f"Ссылка: {vacancy.get('alternate_url', vacancy.get('url', ''))}"
+            )
+        elif source == 'trudvsem':
+            vacancy_details = vacancy
+            salary_text = "Не указана"
+            if vacancy.get('salary'):
+                sal = vacancy['salary']
+                if sal.get('from') and sal.get('to'):
+                    salary_text = f"{sal['from']:,} - {sal['to']:,} руб."
+                elif sal.get('from'):
+                    salary_text = f"от {sal['from']:,} руб."
+                elif sal.get('to'):
+                    salary_text = f"до {sal['to']:,} руб."
+            
+            vacancy_info = (
+                f"🟢 **{vacancy.get('name', 'Вакансия')}**\n\n"
+                f"Компания: {vacancy.get('employer', {}).get('name', 'Не указано')}\n"
+                f"Зарплата: {salary_text}\n"
+                f"Регион: {vacancy.get('area', {}).get('name', 'Не указано')}\n\n"
+                f"Ссылка: {vacancy.get('alternate_url', '')}"
+            )
+        else:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{HH_API_URL}/vacancies/{vacancy['id']}",
+                    headers=HEADERS,
+                    timeout=aiohttp.ClientTimeout(total=15)
+                ) as response:
+                    if response.status != 200:
+                        raise Exception(f"HTTP {response.status}")
+                    vacancy_details = await response.json()
+            
+            description = vacancy_details.get('description', '')
+            from html import unescape
+            import re
+            description = re.sub(r'<[^>]+>', ' ', description)
+            description = unescape(description)
+            description = ' '.join(description.split())[:800]
+            
+            salary_text = "Не указана"
+            if vacancy_details.get('salary'):
+                sal = vacancy_details['salary']
+                if sal.get('from') and sal.get('to'):
+                    salary_text = f"{sal['from']:,} - {sal['to']:,} {sal.get('currency', '')}"
+                elif sal.get('from'):
+                    salary_text = f"от {sal['from']:,} {sal.get('currency', '')}"
+                elif sal.get('to'):
+                    salary_text = f"до {sal['to']:,} {sal.get('currency', '')}"
+            
+            vacancy_info = (
+                f"🔵 **{vacancy_details['name']}**\n\n"
+                f"Компания: {vacancy_details.get('employer', {}).get('name', 'Не указано')}\n"
+                f"Зарплата: {salary_text}\n"
+                f"Город: {vacancy_details.get('area', {}).get('name', 'Не указано')}\n"
+                f"Опыт: {vacancy_details.get('experience', {}).get('name', 'Не указано')}\n"
+                f"Занятость: {vacancy_details.get('schedule', {}).get('name', 'Не указано')}\n\n"
+                f"Описание:\n{description}...\n\n"
+                f"Ссылка: {vacancy_details.get('alternate_url', '')}"
+            )
         
         await context.bot.send_message(
             chat_id=user_id,
