@@ -215,6 +215,7 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         params = {
             'text': query,
+            'search_field': 'name',
             'per_page': 20,
             'page': 0,
             'area': prefs.get('area', 113),
