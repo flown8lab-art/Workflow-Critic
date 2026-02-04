@@ -709,16 +709,23 @@ async def back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "**HH Resume Helper**\n\n"
-        "Этот бот помогает найти работу на hh.ru:\n\n"
-        "1. Загрузи резюме (PDF, Word или текст)\n"
-        "2. Укажи пожелания (зарплата, удалёнка)\n"
-        "3. Найди вакансии\n"
-        "4. Получи сопроводительное письмо\n\n"
-        "Команды:\n"
-        "/start - Начать заново\n"
-        "/help - Эта справка\n\n"
-        "Поддерживаемые форматы резюме: PDF, DOCX, TXT, текст",
+        "🤖 **HH Resume Helper**\n\n"
+        "Автоматический поиск работы на hh.ru\n\n"
+        "**Что умеет бот:**\n"
+        "• Анализирует твоё резюме\n"
+        "• Ищет вакансии с фильтрами (зарплата, удалёнка, опыт)\n"
+        "• Генерирует сопроводительные письма\n"
+        "• Даёт рекомендации по адаптации резюме\n\n"
+        "**Как пользоваться:**\n"
+        "1️⃣ Загрузи резюме (PDF, Word или текст)\n"
+        "2️⃣ Укажи пожелания (например: «удалёнка, от 150к»)\n"
+        "3️⃣ Введи должность для поиска\n"
+        "4️⃣ Выбери вакансию и получи письмо\n\n"
+        "**Команды:**\n"
+        "/start — Начать поиск работы\n"
+        "/help — Справка\n"
+        "/cancel — Отменить\n\n"
+        "📎 Форматы резюме: PDF, DOCX, TXT",
         parse_mode='Markdown'
     )
 
@@ -727,6 +734,13 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Отменено. Для нового поиска: /start")
     return ConversationHandler.END
 
+
+async def post_init(application):
+    await application.bot.set_my_commands([
+        ("start", "Начать поиск работы"),
+        ("help", "Справка и возможности"),
+        ("cancel", "Отменить текущий поиск")
+    ])
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
@@ -737,7 +751,7 @@ def main():
         logger.error("OPENROUTER_API_KEY not set!")
         return
     
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
     
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
