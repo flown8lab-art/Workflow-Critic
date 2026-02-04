@@ -200,6 +200,25 @@ async def receive_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE
     return STEP_SEARCH
 
 
+JOB_SYNONYMS = {
+    'менеджер проекта': ['менеджер проекта', 'менеджер проектов', 'project manager', 'руководитель проекта', 'руководитель проектов', 'проектный менеджер', 'PM'],
+    'project manager': ['project manager', 'менеджер проекта', 'менеджер проектов', 'руководитель проекта', 'PM'],
+    'продакт менеджер': ['продакт менеджер', 'product manager', 'продукт менеджер', 'менеджер продукта', 'product owner', 'PO'],
+    'product manager': ['product manager', 'продакт менеджер', 'product owner', 'менеджер продукта'],
+    'разработчик': ['разработчик', 'developer', 'программист', 'инженер-программист'],
+    'аналитик': ['аналитик', 'analyst', 'бизнес-аналитик', 'системный аналитик', 'data analyst'],
+    'дизайнер': ['дизайнер', 'designer', 'UI дизайнер', 'UX дизайнер', 'UI/UX', 'веб-дизайнер'],
+    'маркетолог': ['маркетолог', 'marketing manager', 'интернет-маркетолог', 'digital маркетолог'],
+    'hr': ['hr', 'HR менеджер', 'рекрутер', 'HR специалист', 'специалист по подбору'],
+}
+
+def expand_query(query: str) -> str:
+    query_lower = query.lower().strip()
+    for key, synonyms in JOB_SYNONYMS.items():
+        if key in query_lower or query_lower in key:
+            return ' OR '.join(synonyms[:5])
+    return query
+
 async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     query = update.message.text.strip()
@@ -210,11 +229,13 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     prefs = user_data_store[user_id].get('preferences', {})
     
+    expanded_query = expand_query(query)
+    
     await update.message.reply_text(f"Ищу вакансии: {query}...")
     
     try:
         params = {
-            'text': query,
+            'text': expanded_query,
             'search_field': 'name',
             'per_page': 20,
             'page': 0,
