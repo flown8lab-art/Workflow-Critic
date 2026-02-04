@@ -47,7 +47,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'resume': None,
         'preferences': {},
         'vacancies': [],
-        'current_vacancy': None
+        'current_vacancy': None,
+        'current_vacancy_index': 0
     }
     
     await update.message.reply_text(
@@ -65,7 +66,7 @@ async def receive_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     resume_text = None
     
     if user_id not in user_data_store:
-        user_data_store[user_id] = {'resume': None, 'preferences': {}, 'vacancies': [], 'current_vacancy': None}
+        user_data_store[user_id] = {'resume': None, 'preferences': {}, 'vacancies': [], 'current_vacancy': None, 'current_vacancy_index': 0}
     
     if update.message.document:
         file = await context.bot.get_file(update.message.document.file_id)
@@ -372,12 +373,16 @@ async def vacancy_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         user_data_store[user_id]['current_vacancy'] = vacancy_details
+        user_data_store[user_id]['current_vacancy_index'] = vacancy_index
         
         keyboard = [
             [InlineKeyboardButton("Сгенерировать сопроводительное письмо", callback_data="gen_cover")],
             [InlineKeyboardButton("Адаптировать резюме", callback_data="adapt_resume")],
             [InlineKeyboardButton("Назад к списку", callback_data="back_search")]
         ]
+        
+        if vacancy_index + 1 < len(vacancies):
+            keyboard.insert(2, [InlineKeyboardButton(f"➡️ Следующая вакансия ({vacancy_index + 2}/{len(vacancies[:10])})", callback_data=f"vac_{vacancy_index + 1}")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await context.bot.send_message(
@@ -479,10 +484,14 @@ async def generate_cover_letter(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode='Markdown'
         )
         
-        keyboard = [
-            [InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")],
-            [InlineKeyboardButton("Новый поиск", callback_data="new_search")]
-        ]
+        vacancies = user_data_store[user_id].get('vacancies', [])
+        current_idx = user_data_store[user_id].get('current_vacancy_index', 0)
+        
+        keyboard = []
+        if current_idx + 1 < len(vacancies[:10]):
+            keyboard.append([InlineKeyboardButton(f"➡️ Следующая вакансия ({current_idx + 2}/{len(vacancies[:10])})", callback_data=f"vac_{current_idx + 1}")])
+        keyboard.append([InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")])
+        keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await context.bot.send_message(
@@ -600,10 +609,14 @@ async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
         
-        keyboard = [
-            [InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")],
-            [InlineKeyboardButton("Новый поиск", callback_data="new_search")]
-        ]
+        vacancies = user_data_store[user_id].get('vacancies', [])
+        current_idx = user_data_store[user_id].get('current_vacancy_index', 0)
+        
+        keyboard = []
+        if current_idx + 1 < len(vacancies[:10]):
+            keyboard.append([InlineKeyboardButton(f"➡️ Следующая вакансия ({current_idx + 2}/{len(vacancies[:10])})", callback_data=f"vac_{current_idx + 1}")])
+        keyboard.append([InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")])
+        keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await context.bot.send_message(
