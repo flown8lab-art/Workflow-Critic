@@ -424,7 +424,7 @@ async def vacancy_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         
         if vacancy_index + 1 < len(vacancies):
-            keyboard.insert(2, [InlineKeyboardButton(f"➡️ Следующая вакансия ({vacancy_index + 2}/{len(vacancies[:10])})", callback_data=f"vac_{vacancy_index + 1}")])
+            keyboard.insert(2, [InlineKeyboardButton(f"➡️ Следующая ({vacancy_index + 2} из {len(vacancies)})", callback_data=f"vac_{vacancy_index + 1}")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await context.bot.send_message(
@@ -531,7 +531,7 @@ async def generate_cover_letter(update: Update, context: ContextTypes.DEFAULT_TY
         
         keyboard = []
         if current_idx + 1 < len(vacancies[:10]):
-            keyboard.append([InlineKeyboardButton(f"➡️ Следующая вакансия ({current_idx + 2}/{len(vacancies[:10])})", callback_data=f"vac_{current_idx + 1}")])
+            keyboard.append([InlineKeyboardButton(f"➡️ Следующая ({current_idx + 2} из {len(vacancies)})", callback_data=f"vac_{current_idx + 1}")])
         keyboard.append([InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")])
         keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -656,7 +656,7 @@ async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = []
         if current_idx + 1 < len(vacancies[:10]):
-            keyboard.append([InlineKeyboardButton(f"➡️ Следующая вакансия ({current_idx + 2}/{len(vacancies[:10])})", callback_data=f"vac_{current_idx + 1}")])
+            keyboard.append([InlineKeyboardButton(f"➡️ Следующая ({current_idx + 2} из {len(vacancies)})", callback_data=f"vac_{current_idx + 1}")])
         keyboard.append([InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")])
         keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
         reply_markup = InlineKeyboardMarkup(keyboard)
