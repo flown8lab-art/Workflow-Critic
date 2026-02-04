@@ -251,7 +251,7 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         user_data_store[user_id]['vacancies'] = vacancies
         
-        vacancy_list = []
+        keyboard = []
         for i, vac in enumerate(vacancies[:10]):
             salary_text = ""
             if vac.get('salary'):
@@ -263,28 +263,16 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 elif sal.get('to'):
                     salary_text = f" (до {sal['to']//1000}k)"
             
-            company = vac.get('employer', {}).get('name', '')[:20]
-            vacancy_list.append(f"{i+1}. {vac['name']}{salary_text}\n   📍 {company}")
+            company = vac.get('employer', {}).get('name', '')[:15]
+            btn_text = f"{i+1}. {vac['name'][:35]}{salary_text} • {company}"
+            keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"vac_{i}")])
         
-        vacancy_text = "\n\n".join(vacancy_list)
-        
-        keyboard = []
-        row = []
-        for i in range(min(10, len(vacancies))):
-            row.append(InlineKeyboardButton(str(i+1), callback_data=f"vac_{i}"))
-            if len(row) == 5:
-                keyboard.append(row)
-                row = []
-        if row:
-            keyboard.append(row)
-        
-        keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
+        keyboard.append([InlineKeyboardButton("🔄 Новый поиск", callback_data="new_search")])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             f"Найдено {data.get('found', 0)} вакансий за 2 недели.\n\n"
-            f"{vacancy_text}\n\n"
-            "Выбери номер вакансии:",
+            "Нажми на вакансию для просмотра:",
             reply_markup=reply_markup
         )
         return STEP_VACANCY
@@ -653,7 +641,7 @@ async def back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     vacancies = user_data_store[user_id]['vacancies']
     
-    vacancy_list = []
+    keyboard = []
     for i, vac in enumerate(vacancies[:10]):
         salary_text = ""
         if vac.get('salary'):
@@ -665,26 +653,15 @@ async def back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif sal.get('to'):
                 salary_text = f" (до {sal['to']//1000}k)"
         
-        company = vac.get('employer', {}).get('name', '')[:20]
-        vacancy_list.append(f"{i+1}. {vac['name']}{salary_text}\n   📍 {company}")
+        company = vac.get('employer', {}).get('name', '')[:15]
+        btn_text = f"{i+1}. {vac['name'][:35]}{salary_text} • {company}"
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"vac_{i}")])
     
-    vacancy_text = "\n\n".join(vacancy_list)
-    
-    keyboard = []
-    row = []
-    for i in range(min(10, len(vacancies))):
-        row.append(InlineKeyboardButton(str(i+1), callback_data=f"vac_{i}"))
-        if len(row) == 5:
-            keyboard.append(row)
-            row = []
-    if row:
-        keyboard.append(row)
-    
-    keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
+    keyboard.append([InlineKeyboardButton("🔄 Новый поиск", callback_data="new_search")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
-        f"{vacancy_text}\n\nВыбери номер вакансии:",
+        "Нажми на вакансию для просмотра:",
         reply_markup=reply_markup
     )
     return STEP_VACANCY
