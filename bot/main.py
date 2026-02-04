@@ -27,7 +27,7 @@ WAITING_RESUME, WAITING_SEARCH, SELECTING_VACANCY = range(3)
 user_data_store = {}
 
 HH_API_URL = "https://api.hh.ru"
-HEADERS = {'User-Agent': 'HHResumeHelper/1.0 (api@example.com)'}
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
