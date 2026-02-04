@@ -2,6 +2,7 @@ import os
 import io
 import json
 import logging
+import asyncio
 import aiohttp
 import requests
 from datetime import datetime
@@ -950,7 +951,37 @@ def main():
     application.add_handler(CommandHandler('myid', myid_command))
     
     logger.info("Bot starting...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    async def run_parser_periodically():
+        """Run telegram parser every 12 hours"""
+        await asyncio.sleep(120)
+        while True:
+            try:
+                logger.info("Starting scheduled parser run...")
+                import subprocess
+                result = subprocess.run(
+                    ['python', 'bot/telegram_parser.py'],
+                    capture_output=True,
+                    text=True,
+                    timeout=300
+                )
+                if result.returncode == 0:
+                    logger.info("Parser completed successfully")
+                else:
+                    logger.error(f"Parser error: {result.stderr}")
+            except Exception as e:
+                logger.error(f"Parser exception: {e}")
+            await asyncio.sleep(12 * 60 * 60)
+    
+    async def run_bot():
+        async with application:
+            await application.initialize()
+            await application.start()
+            asyncio.create_task(run_parser_periodically())
+            await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+            await asyncio.Event().wait()
+    
+    asyncio.run(run_bot())
 
 
 if __name__ == '__main__':
