@@ -319,6 +319,30 @@ async def search_trudvsem(query: str, prefs: dict) -> list:
         logger.error(f"Trudvsem error: {e}")
         return []
 
+def search_telegram_vacancies(query: str, prefs: dict) -> list:
+    try:
+        with open('bot/telegram_vacancies.json', 'r', encoding='utf-8') as f:
+            all_vacancies = json.load(f)
+    except:
+        return []
+    
+    query_lower = query.lower()
+    query_words = query_lower.split()
+    
+    results = []
+    for vac in all_vacancies:
+        text = (vac.get('name', '') + ' ' + vac.get('full_text', '')).lower()
+        
+        if any(word in text for word in query_words):
+            if prefs.get('salary'):
+                sal = vac.get('salary')
+                if sal and sal.get('to') and sal['to'] < prefs['salary']:
+                    continue
+            
+            results.append(vac)
+    
+    return results[:20]
+
 def build_vacancy_keyboard(vacancies: list, page: int = 0, page_size: int = 10) -> list:
     start = page * page_size
     end = start + page_size
@@ -341,7 +365,12 @@ def build_vacancy_keyboard(vacancies: list, page: int = 0, page_size: int = 10) 
                 salary_text = f" (до {sal_to//1000}k)"
         
         source = vac.get('source', 'hh')
-        source_icon = "🔵" if source == 'hh' else "🟢"
+        if source == 'hh':
+            source_icon = "🔵"
+        elif source == 'trudvsem':
+            source_icon = "🟢"
+        else:
+            source_icon = "📱"
         company = vac.get('employer', {}).get('name', '')[:12]
         btn_text = f"{source_icon} {vac['name'][:32]}{salary_text} • {company}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"vac_{idx}")])
@@ -406,8 +435,9 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
             vac['source'] = 'hh'
         
         tv_vacancies = await search_trudvsem(query, prefs)
+        tg_vacancies = search_telegram_vacancies(query, prefs)
         
-        vacancies = hh_vacancies + tv_vacancies
+        vacancies = hh_vacancies + tv_vacancies + tg_vacancies
         
         if not vacancies:
             await update.message.reply_text(
@@ -430,6 +460,8 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sources.append(f"hh.ru: {len(hh_vacancies)}")
         if tv_vacancies:
             sources.append(f"Работа России: {len(tv_vacancies)}")
+        if tg_vacancies:
+            sources.append(f"Telegram: {len(tg_vacancies)}")
         source_text = " + ".join(sources) if sources else ""
         
         user_data_store[user_id]['vacancies'] = vacancies
