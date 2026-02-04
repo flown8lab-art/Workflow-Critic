@@ -1,8 +1,10 @@
 import os
 import io
+import json
 import logging
 import aiohttp
 import requests
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
@@ -32,18 +34,46 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
+ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
 
 STEP_START, STEP_RESUME, STEP_PREFERENCES, STEP_SEARCH, STEP_VACANCY = range(5)
 
 user_data_store = {}
+STATS_FILE = 'bot/stats.json'
 
 HH_API_URL = "https://api.hh.ru"
 TRUDVSEM_API_URL = "http://opendata.trudvsem.ru/api/v1"
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
+def load_stats():
+    try:
+        with open(STATS_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {'users': [], 'total_searches': 0}
+
+def save_stats(stats):
+    try:
+        with open(STATS_FILE, 'w') as f:
+            json.dump(stats, f)
+    except Exception as e:
+        logger.error(f"Error saving stats: {e}")
+
+def track_user(user_id: int):
+    stats = load_stats()
+    if user_id not in stats['users']:
+        stats['users'].append(user_id)
+        save_stats(stats)
+
+def track_search():
+    stats = load_stats()
+    stats['total_searches'] = stats.get('total_searches', 0) + 1
+    save_stats(stats)
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    track_user(user_id)
     user_data_store[user_id] = {
         'resume': None,
         'preferences': {},
@@ -60,6 +90,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
     return STEP_RESUME
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if ADMIN_ID and user_id != ADMIN_ID:
+        await update.message.reply_text("Эта команда только для администратора.")
+        return
+    
+    stats = load_stats()
+    total_users = len(stats.get('users', []))
+    total_searches = stats.get('total_searches', 0)
+    
+    await update.message.reply_text(
+        f"📊 **Статистика бота**\n\n"
+        f"👥 Уникальных пользователей: {total_users}\n"
+        f"🔍 Всего поисков: {total_searches}\n"
+        f"📅 Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        parse_mode='Markdown'
+    )
+
+async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    await update.message.reply_text(f"Твой Telegram ID: `{user_id}`", parse_mode='Markdown')
 
 
 async def receive_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -313,6 +365,7 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Начни сначала: /start")
         return ConversationHandler.END
     
+    track_search()
     prefs = user_data_store[user_id].get('preferences', {})
     
     expanded_query = expand_query(query)
@@ -861,6 +914,8 @@ def main():
     
     application.add_handler(conv_handler)
     application.add_handler(CommandHandler('help', help_command))
+    application.add_handler(CommandHandler('stats', stats_command))
+    application.add_handler(CommandHandler('myid', myid_command))
     
     logger.info("Bot starting...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
