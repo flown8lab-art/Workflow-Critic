@@ -32,14 +32,12 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
-SUPERJOB_API_KEY = os.environ.get('SUPERJOB_API_KEY')
 
 STEP_START, STEP_RESUME, STEP_PREFERENCES, STEP_SEARCH, STEP_VACANCY = range(5)
 
 user_data_store = {}
 
 HH_API_URL = "https://api.hh.ru"
-SUPERJOB_API_URL = "https://api.superjob.ru/2.0"
 TRUDVSEM_API_URL = "http://opendata.trudvsem.ru/api/v1"
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
@@ -222,59 +220,6 @@ def expand_query(query: str) -> str:
             return ' OR '.join(synonyms[:5])
     return query
 
-async def search_superjob(query: str, prefs: dict) -> list:
-    if not SUPERJOB_API_KEY:
-        return []
-    
-    try:
-        params = {
-            'keyword': query,
-            'count': 20,
-            'page': 0,
-            'date_published_from': 14
-        }
-        
-        if prefs.get('salary'):
-            params['payment_from'] = prefs['salary']
-        if prefs.get('schedule') == 'remote':
-            params['place_of_work'] = 1
-        
-        headers = {
-            'X-Api-App-Id': SUPERJOB_API_KEY,
-            'User-Agent': 'Mozilla/5.0'
-        }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{SUPERJOB_API_URL}/vacancies/",
-                params=params,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as response:
-                if response.status != 200:
-                    return []
-                data = await response.json()
-        
-        vacancies = []
-        for item in data.get('objects', []):
-            vacancies.append({
-                'id': f"sj_{item.get('id')}",
-                'name': item.get('profession', ''),
-                'employer': {'name': item.get('firm_name', '')},
-                'salary': {
-                    'from': item.get('payment_from'),
-                    'to': item.get('payment_to'),
-                    'currency': 'RUR'
-                } if item.get('payment_from') or item.get('payment_to') else None,
-                'alternate_url': item.get('link', ''),
-                'area': {'name': item.get('town', {}).get('title', '')},
-                'source': 'superjob'
-            })
-        return vacancies
-    except Exception as e:
-        logger.error(f"SuperJob error: {e}")
-        return []
-
 async def search_trudvsem(query: str, prefs: dict) -> list:
     try:
         params = {
@@ -344,7 +289,7 @@ def build_vacancy_keyboard(vacancies: list, page: int = 0, page_size: int = 10) 
                 salary_text = f" (до {sal_to//1000}k)"
         
         source = vac.get('source', 'hh')
-        source_icon = "🔵" if source == 'hh' else ("🟠" if source == 'superjob' else "🟢")
+        source_icon = "🔵" if source == 'hh' else "🟢"
         company = vac.get('employer', {}).get('name', '')[:12]
         btn_text = f"{source_icon} {vac['name'][:32]}{salary_text} • {company}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"vac_{idx}")])
@@ -407,10 +352,9 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for vac in hh_vacancies:
             vac['source'] = 'hh'
         
-        sj_vacancies = await search_superjob(query, prefs)
         tv_vacancies = await search_trudvsem(query, prefs)
         
-        vacancies = hh_vacancies + sj_vacancies + tv_vacancies
+        vacancies = hh_vacancies + tv_vacancies
         
         if not vacancies:
             await update.message.reply_text(
@@ -431,8 +375,6 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sources = []
         if hh_vacancies:
             sources.append(f"hh.ru: {len(hh_vacancies)}")
-        if sj_vacancies:
-            sources.append(f"SuperJob: {len(sj_vacancies)}")
         if tv_vacancies:
             sources.append(f"Работа России: {len(tv_vacancies)}")
         source_text = " + ".join(sources) if sources else ""
