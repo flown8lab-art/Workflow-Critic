@@ -1,5 +1,6 @@
 import os
 import logging
+import aiohttp
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -104,17 +105,20 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'text': query,
             'per_page': 10,
             'page': 0,
-            'area': 113  # 113 = Россия
+            'area': 113
         }
         
-        response = requests.get(
-            f"{HH_API_URL}/vacancies",
-            params=params,
-            headers=HEADERS,
-            timeout=10
-        )
-        response.raise_for_status()
-        data = response.json()
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{HH_API_URL}/vacancies",
+                params=params,
+                headers=HEADERS,
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"HTTP {response.status}: {error_text[:200]}")
+                data = await response.json()
         
         vacancies = data.get('items', [])
         
