@@ -155,9 +155,15 @@ async def receive_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE
             prefs['schedule'] = 'fullDay'
         
         import re
-        salary_match = re.search(r'от\s*(\d+)', text.replace(' ', ''))
+        salary_match = re.search(r'от\s*(\d+)\s*(тыс|к|k)?', text.replace(' ', ''), re.IGNORECASE)
         if salary_match:
-            prefs['salary'] = int(salary_match.group(1))
+            salary = int(salary_match.group(1))
+            suffix = salary_match.group(2)
+            if suffix and suffix.lower() in ['тыс', 'к', 'k']:
+                salary = salary * 1000
+            elif salary < 1000:
+                salary = salary * 1000
+            prefs['salary'] = salary
         
         if 'без опыт' in text or 'нет опыт' in text:
             prefs['experience'] = 'noExperience'
@@ -172,7 +178,11 @@ async def receive_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE
     if prefs.get('schedule') == 'remote':
         pref_text.append("удалёнка")
     if prefs.get('salary'):
-        pref_text.append(f"от {prefs['salary']} руб")
+        sal = prefs['salary']
+        if sal >= 1000:
+            pref_text.append(f"от {sal//1000}k руб")
+        else:
+            pref_text.append(f"от {sal} руб")
     if prefs.get('experience'):
         exp_map = {'noExperience': 'без опыта', 'between1And3': '1-3 года', 'between3And6': '3-6 лет'}
         pref_text.append(exp_map.get(prefs['experience'], ''))
