@@ -40,6 +40,7 @@ user_data_store = {}
 
 HH_API_URL = "https://api.hh.ru"
 SUPERJOB_API_URL = "https://api.superjob.ru/2.0"
+TRUDVSEM_API_URL = "http://opendata.trudvsem.ru/api/v1"
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
 
@@ -274,6 +275,53 @@ async def search_superjob(query: str, prefs: dict) -> list:
         logger.error(f"SuperJob error: {e}")
         return []
 
+async def search_trudvsem(query: str, prefs: dict) -> list:
+    try:
+        params = {
+            'text': query,
+            'offset': 0,
+            'limit': 30
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{TRUDVSEM_API_URL}/vacancies",
+                params=params,
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                if response.status != 200:
+                    return []
+                data = await response.json()
+        
+        vacancies = []
+        results = data.get('results', {}).get('vacancies', [])
+        
+        for item in results:
+            vac = item.get('vacancy', {})
+            salary_min = vac.get('salary_min')
+            salary_max = vac.get('salary_max')
+            
+            if prefs.get('salary') and salary_max and salary_max < prefs['salary']:
+                continue
+            
+            vacancies.append({
+                'id': f"tv_{vac.get('id', '')}",
+                'name': vac.get('job-name', ''),
+                'employer': {'name': vac.get('company', {}).get('name', '')},
+                'salary': {
+                    'from': salary_min,
+                    'to': salary_max,
+                    'currency': 'RUR'
+                } if salary_min or salary_max else None,
+                'alternate_url': f"https://trudvsem.ru/vacancy/card/{vac.get('company', {}).get('companycode', '')}/{vac.get('id', '')}",
+                'area': {'name': vac.get('region', {}).get('name', '')},
+                'source': 'trudvsem'
+            })
+        return vacancies[:20]
+    except Exception as e:
+        logger.error(f"Trudvsem error: {e}")
+        return []
+
 def build_vacancy_keyboard(vacancies: list, page: int = 0, page_size: int = 10) -> list:
     start = page * page_size
     end = start + page_size
@@ -295,7 +343,8 @@ def build_vacancy_keyboard(vacancies: list, page: int = 0, page_size: int = 10) 
             elif sal_to:
                 salary_text = f" (до {sal_to//1000}k)"
         
-        source_icon = "🔵" if vac.get('source') == 'hh' else "🟠"
+        source = vac.get('source', 'hh')
+        source_icon = "🔵" if source == 'hh' else ("🟠" if source == 'superjob' else "🟢")
         company = vac.get('employer', {}).get('name', '')[:12]
         btn_text = f"{source_icon} {vac['name'][:32]}{salary_text} • {company}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"vac_{idx}")])
@@ -359,8 +408,9 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
             vac['source'] = 'hh'
         
         sj_vacancies = await search_superjob(query, prefs)
+        tv_vacancies = await search_trudvsem(query, prefs)
         
-        vacancies = hh_vacancies + sj_vacancies
+        vacancies = hh_vacancies + sj_vacancies + tv_vacancies
         
         if not vacancies:
             await update.message.reply_text(
@@ -383,6 +433,8 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sources.append(f"hh.ru: {len(hh_vacancies)}")
         if sj_vacancies:
             sources.append(f"SuperJob: {len(sj_vacancies)}")
+        if tv_vacancies:
+            sources.append(f"Работа России: {len(tv_vacancies)}")
         source_text = " + ".join(sources) if sources else ""
         
         user_data_store[user_id]['vacancies'] = vacancies
