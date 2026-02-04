@@ -72,3 +72,7 @@ packages = ["openssl"]
 
 [userenv.shared]
 ADMIN_ID = "7166513643"
+
+[deployment]
+deploymentTarget = "scheduled"
+run = ["python", "bot/telegram_parser.py"]
