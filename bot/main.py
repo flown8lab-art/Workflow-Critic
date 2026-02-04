@@ -630,7 +630,7 @@ async def vacancy_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("Сгенерировать сопроводительное письмо", callback_data="gen_cover")],
             [InlineKeyboardButton("Адаптировать резюме", callback_data="adapt_resume")],
-            [InlineKeyboardButton("Назад к списку", callback_data="back_search")]
+            [InlineKeyboardButton("Назад к списку", callback_data="back_to_list")]
         ]
         
         if vacancy_index + 1 < len(vacancies):
