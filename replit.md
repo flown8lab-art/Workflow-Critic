@@ -1,39 +1,45 @@
-# n8n Workflow Critic
+# HH Resume Helper Bot
 
 ## Overview
-Веб-приложение для критического анализа n8n workflow. Анализирует экспортированный JSON workflow и предоставляет детальную критику по категориям: безопасность, архитектура, AI-промпты, стоимость, надёжность.
+Telegram-бот для автоматизации поиска работы на hh.ru. Анализирует резюме, ищет вакансии с фильтрами, генерирует сопроводительные письма и адаптирует резюме под конкретные позиции.
 
 ## Current State
-Полнофункциональное приложение с анализом workflow Lead_vc.ru для B2B лидогенерации через vc.ru.
+Полнофункциональный Telegram-бот с пошаговым интерфейсом.
 
 ## Tech Stack
-- React 19 + TypeScript
-- Vite (dev server on port 5000)
-- Lucide React (icons)
-- Tailwind-like custom CSS
+- Python 3.11 + python-telegram-bot
+- aiohttp для асинхронных HTTP-запросов
+- OpenRouter API (GPT-4o-mini) для генерации текстов
+- hh.ru API для поиска вакансий
+- PyPDF2 + python-docx для парсинга резюме
 
 ## Project Structure
 ```
-├── src/
-│   ├── App.tsx        # Main component with workflow analysis
-│   ├── main.tsx       # React entry point
-│   └── index.css      # Global styles
-├── index.html         # HTML template
-├── vite.config.ts     # Vite configuration
-├── tsconfig.json      # TypeScript configuration
-└── attached_assets/   # Original workflow JSON
+├── bot/
+│   └── main.py         # Telegram bot (ConversationHandler)
+├── src/                # Legacy n8n workflow analyzer (inactive)
+├── attached_assets/    # Original workflow JSON files
+└── pyproject.toml      # Python dependencies
 ```
 
-## Running the Project
-```bash
-npm run dev
-```
+## Running the Bot
+Workflow "Telegram Bot" runs: `python bot/main.py`
 
-## Key Features
-- Анализ 6 категорий: безопасность, архитектура, AI-промпты, стоимость, надёжность, код
-- Severity levels: critical, warning, info
-- Приоритетный план действий
-- Интерактивные секции
+## Bot Features
+1. **Пошаговый флоу**: START → RESUME → PREFERENCES → SEARCH → VACANCY
+2. **Парсинг резюме**: PDF, Word (.docx), TXT, текст
+3. **Фильтры вакансий**: последние 2 недели, зарплата, удалёнка, опыт
+4. **AI-генерация**: сопроводительные письма и рекомендации по резюме
+5. **hh.ru API**: поиск с параметрами period=14, schedule, salary, experience
+
+## Environment Variables (Secrets)
+- TELEGRAM_BOT_TOKEN
+- OPENROUTER_API_KEY
+- SESSION_SECRET
 
 ## Recent Changes
-- Initial creation (2026-01-23): Full workflow analysis application
+- 2026-02-04: Fixed conversation loop, added step-by-step guidance
+- 2026-02-04: Added PDF/Word resume parsing (PyPDF2, python-docx)
+- 2026-02-04: Added vacancy filters (2 weeks, salary, remote)
+- 2026-02-04: Fixed hh.ru User-Agent blacklist issue
+- 2026-02-04: Switched to aiohttp for async HTTP
