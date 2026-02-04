@@ -32,12 +32,14 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
+SUPERJOB_API_KEY = os.environ.get('SUPERJOB_API_KEY')
 
 STEP_START, STEP_RESUME, STEP_PREFERENCES, STEP_SEARCH, STEP_VACANCY = range(5)
 
 user_data_store = {}
 
 HH_API_URL = "https://api.hh.ru"
+SUPERJOB_API_URL = "https://api.superjob.ru/2.0"
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
 
@@ -219,6 +221,59 @@ def expand_query(query: str) -> str:
             return ' OR '.join(synonyms[:5])
     return query
 
+async def search_superjob(query: str, prefs: dict) -> list:
+    if not SUPERJOB_API_KEY:
+        return []
+    
+    try:
+        params = {
+            'keyword': query,
+            'count': 20,
+            'page': 0,
+            'date_published_from': 14
+        }
+        
+        if prefs.get('salary'):
+            params['payment_from'] = prefs['salary']
+        if prefs.get('schedule') == 'remote':
+            params['place_of_work'] = 1
+        
+        headers = {
+            'X-Api-App-Id': SUPERJOB_API_KEY,
+            'User-Agent': 'Mozilla/5.0'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{SUPERJOB_API_URL}/vacancies/",
+                params=params,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                if response.status != 200:
+                    return []
+                data = await response.json()
+        
+        vacancies = []
+        for item in data.get('objects', []):
+            vacancies.append({
+                'id': f"sj_{item.get('id')}",
+                'name': item.get('profession', ''),
+                'employer': {'name': item.get('firm_name', '')},
+                'salary': {
+                    'from': item.get('payment_from'),
+                    'to': item.get('payment_to'),
+                    'currency': 'RUR'
+                } if item.get('payment_from') or item.get('payment_to') else None,
+                'alternate_url': item.get('link', ''),
+                'area': {'name': item.get('town', {}).get('title', '')},
+                'source': 'superjob'
+            })
+        return vacancies
+    except Exception as e:
+        logger.error(f"SuperJob error: {e}")
+        return []
+
 def build_vacancy_keyboard(vacancies: list, page: int = 0, page_size: int = 10) -> list:
     start = page * page_size
     end = start + page_size
@@ -231,15 +286,18 @@ def build_vacancy_keyboard(vacancies: list, page: int = 0, page_size: int = 10) 
         salary_text = ""
         if vac.get('salary'):
             sal = vac['salary']
-            if sal.get('from') and sal.get('to'):
-                salary_text = f" ({sal['from']//1000}k-{sal['to']//1000}k)"
-            elif sal.get('from'):
-                salary_text = f" (от {sal['from']//1000}k)"
-            elif sal.get('to'):
-                salary_text = f" (до {sal['to']//1000}k)"
+            sal_from = sal.get('from') or 0
+            sal_to = sal.get('to') or 0
+            if sal_from and sal_to:
+                salary_text = f" ({sal_from//1000}k-{sal_to//1000}k)"
+            elif sal_from:
+                salary_text = f" (от {sal_from//1000}k)"
+            elif sal_to:
+                salary_text = f" (до {sal_to//1000}k)"
         
-        company = vac.get('employer', {}).get('name', '')[:15]
-        btn_text = f"{idx+1}. {vac['name'][:35]}{salary_text} • {company}"
+        source_icon = "🔵" if vac.get('source') == 'hh' else "🟠"
+        company = vac.get('employer', {}).get('name', '')[:12]
+        btn_text = f"{source_icon} {vac['name'][:32]}{salary_text} • {company}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"vac_{idx}")])
     
     nav_row = []
@@ -296,7 +354,13 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     raise Exception(f"HTTP {response.status}: {error_text[:200]}")
                 data = await response.json()
         
-        vacancies = data.get('items', [])
+        hh_vacancies = data.get('items', [])
+        for vac in hh_vacancies:
+            vac['source'] = 'hh'
+        
+        sj_vacancies = await search_superjob(query, prefs)
+        
+        vacancies = hh_vacancies + sj_vacancies
         
         if not vacancies:
             await update.message.reply_text(
@@ -308,21 +372,29 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
         seen = set()
         unique_vacancies = []
         for vac in vacancies:
-            key = (vac.get('id'), vac.get('name', ''), vac.get('employer', {}).get('name', ''))
+            key = (vac.get('name', '').lower(), vac.get('employer', {}).get('name', '').lower())
             if key not in seen:
                 seen.add(key)
                 unique_vacancies.append(vac)
         vacancies = unique_vacancies
         
+        sources = []
+        if hh_vacancies:
+            sources.append(f"hh.ru: {len(hh_vacancies)}")
+        if sj_vacancies:
+            sources.append(f"SuperJob: {len(sj_vacancies)}")
+        source_text = " + ".join(sources) if sources else ""
+        
         user_data_store[user_id]['vacancies'] = vacancies
         user_data_store[user_id]['current_page'] = 0
-        user_data_store[user_id]['total_found'] = data.get('found', 0)
+        user_data_store[user_id]['total_found'] = len(vacancies)
+        user_data_store[user_id]['source_text'] = source_text
         
         keyboard = build_vacancy_keyboard(vacancies, 0)
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            f"Найдено {data.get('found', 0)} вакансий за 2 недели.\n\n"
+            f"Найдено {len(vacancies)} вакансий ({source_text})\n\n"
             "Нажми на вакансию для просмотра:",
             reply_markup=reply_markup
         )
