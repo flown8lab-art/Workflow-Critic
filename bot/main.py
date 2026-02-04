@@ -458,21 +458,33 @@ async def generate_cover_letter(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode='Markdown'
         )
         
+        keyboard = [
+            [InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")],
+            [InlineKeyboardButton("Новый поиск", callback_data="new_search")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Ссылка на вакансию: {vacancy.get('alternate_url', '')}\n\n"
-                 "Скопируй письмо и отправь вместе с откликом на hh.ru\n\n"
-                 "Для нового поиска: /start"
+            text=f"Ссылка: {vacancy.get('alternate_url', '')}\n\n"
+                 "Скопируй письмо и отправь на hh.ru",
+            reply_markup=reply_markup
         )
-        return ConversationHandler.END
+        return STEP_VACANCY
         
     except Exception as e:
         logger.error(f"Error generating cover letter: {e}")
+        keyboard = [
+            [InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")],
+            [InlineKeyboardButton("Новый поиск", callback_data="new_search")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Ошибка генерации: {str(e)}\n\nПопробуй ещё раз или /start"
+            text=f"Ошибка генерации: {str(e)}",
+            reply_markup=reply_markup
         )
-        return ConversationHandler.END
+        return STEP_VACANCY
 
 
 async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -553,19 +565,69 @@ async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
         
+        keyboard = [
+            [InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")],
+            [InlineKeyboardButton("Новый поиск", callback_data="new_search")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await context.bot.send_message(
             chat_id=user_id,
-            text="Для нового поиска: /start"
+            text="Что дальше?",
+            reply_markup=reply_markup
         )
-        return ConversationHandler.END
+        return STEP_VACANCY
         
     except Exception as e:
         logger.error(f"Error adapting resume: {e}")
+        keyboard = [
+            [InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")],
+            [InlineKeyboardButton("Новый поиск", callback_data="new_search")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Ошибка анализа: {str(e)}\n\nПопробуй /start"
+            text=f"Ошибка анализа: {str(e)}",
+            reply_markup=reply_markup
         )
+        return STEP_VACANCY
+
+
+async def back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    
+    if user_id not in user_data_store or not user_data_store[user_id].get('vacancies'):
+        await query.edit_message_text("Сессия истекла. Начни заново: /start")
         return ConversationHandler.END
+    
+    vacancies = user_data_store[user_id]['vacancies']
+    
+    keyboard = []
+    for i, vac in enumerate(vacancies[:10]):
+        salary_text = ""
+        if vac.get('salary'):
+            sal = vac['salary']
+            if sal.get('from') and sal.get('to'):
+                salary_text = f" | {sal['from']//1000}k-{sal['to']//1000}k"
+            elif sal.get('from'):
+                salary_text = f" | от {sal['from']//1000}k"
+            elif sal.get('to'):
+                salary_text = f" | до {sal['to']//1000}k"
+        
+        button_text = f"{vac['name'][:25]}{salary_text}"
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=f"vac_{i}")])
+    
+    keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        "Выбери другую вакансию:",
+        reply_markup=reply_markup
+    )
+    return STEP_VACANCY
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -617,6 +679,7 @@ def main():
                 CallbackQueryHandler(vacancy_selected, pattern=r'^vac_\d+$'),
                 CallbackQueryHandler(vacancy_selected, pattern='^new_search$'),
                 CallbackQueryHandler(vacancy_selected, pattern='^back_search$'),
+                CallbackQueryHandler(back_to_list, pattern='^back_to_list$'),
                 CallbackQueryHandler(generate_cover_letter, pattern='^gen_cover$'),
                 CallbackQueryHandler(adapt_resume, pattern='^adapt_resume$'),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, search_vacancies)
