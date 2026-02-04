@@ -305,6 +305,15 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return STEP_SEARCH
         
+        seen = set()
+        unique_vacancies = []
+        for vac in vacancies:
+            key = (vac.get('id'), vac.get('name', ''), vac.get('employer', {}).get('name', ''))
+            if key not in seen:
+                seen.add(key)
+                unique_vacancies.append(vac)
+        vacancies = unique_vacancies
+        
         user_data_store[user_id]['vacancies'] = vacancies
         user_data_store[user_id]['current_page'] = 0
         user_data_store[user_id]['total_found'] = data.get('found', 0)
