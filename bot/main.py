@@ -219,6 +219,40 @@ def expand_query(query: str) -> str:
             return ' OR '.join(synonyms[:5])
     return query
 
+def build_vacancy_keyboard(vacancies: list, page: int = 0, page_size: int = 10) -> list:
+    start = page * page_size
+    end = start + page_size
+    page_vacancies = vacancies[start:end]
+    total_pages = (len(vacancies) + page_size - 1) // page_size
+    
+    keyboard = []
+    for i, vac in enumerate(page_vacancies):
+        idx = start + i
+        salary_text = ""
+        if vac.get('salary'):
+            sal = vac['salary']
+            if sal.get('from') and sal.get('to'):
+                salary_text = f" ({sal['from']//1000}k-{sal['to']//1000}k)"
+            elif sal.get('from'):
+                salary_text = f" (от {sal['from']//1000}k)"
+            elif sal.get('to'):
+                salary_text = f" (до {sal['to']//1000}k)"
+        
+        company = vac.get('employer', {}).get('name', '')[:15]
+        btn_text = f"{idx+1}. {vac['name'][:35]}{salary_text} • {company}"
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"vac_{idx}")])
+    
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"page_{page-1}"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton("➡️ Ещё", callback_data=f"page_{page+1}"))
+    if nav_row:
+        keyboard.append(nav_row)
+    
+    keyboard.append([InlineKeyboardButton("🔄 Новый поиск", callback_data="new_search")])
+    return keyboard
+
 async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     query = update.message.text.strip()
@@ -272,24 +306,10 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return STEP_SEARCH
         
         user_data_store[user_id]['vacancies'] = vacancies
+        user_data_store[user_id]['current_page'] = 0
+        user_data_store[user_id]['total_found'] = data.get('found', 0)
         
-        keyboard = []
-        for i, vac in enumerate(vacancies[:10]):
-            salary_text = ""
-            if vac.get('salary'):
-                sal = vac['salary']
-                if sal.get('from') and sal.get('to'):
-                    salary_text = f" ({sal['from']//1000}k-{sal['to']//1000}k)"
-                elif sal.get('from'):
-                    salary_text = f" (от {sal['from']//1000}k)"
-                elif sal.get('to'):
-                    salary_text = f" (до {sal['to']//1000}k)"
-            
-            company = vac.get('employer', {}).get('name', '')[:15]
-            btn_text = f"{i+1}. {vac['name'][:35]}{salary_text} • {company}"
-            keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"vac_{i}")])
-        
-        keyboard.append([InlineKeyboardButton("🔄 Новый поиск", callback_data="new_search")])
+        keyboard = build_vacancy_keyboard(vacancies, 0)
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
@@ -321,6 +341,18 @@ async def vacancy_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "back_search":
         await query.edit_message_text("Введи новый поисковый запрос:")
         return STEP_SEARCH
+    
+    if query.data.startswith("page_"):
+        page = int(query.data.split('_')[1])
+        vacancies = user_data_store[user_id].get('vacancies', [])
+        user_data_store[user_id]['current_page'] = page
+        keyboard = build_vacancy_keyboard(vacancies, page)
+        total = user_data_store[user_id].get('total_found', len(vacancies))
+        await query.edit_message_text(
+            f"Найдено {total} вакансий (стр. {page+1}).\n\nНажми на вакансию:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return STEP_VACANCY
     
     vacancy_index = int(query.data.split('_')[1])
     
@@ -662,28 +694,14 @@ async def back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     
     vacancies = user_data_store[user_id]['vacancies']
+    page = user_data_store[user_id].get('current_page', 0)
+    total = user_data_store[user_id].get('total_found', len(vacancies))
     
-    keyboard = []
-    for i, vac in enumerate(vacancies[:10]):
-        salary_text = ""
-        if vac.get('salary'):
-            sal = vac['salary']
-            if sal.get('from') and sal.get('to'):
-                salary_text = f" ({sal['from']//1000}k-{sal['to']//1000}k)"
-            elif sal.get('from'):
-                salary_text = f" (от {sal['from']//1000}k)"
-            elif sal.get('to'):
-                salary_text = f" (до {sal['to']//1000}k)"
-        
-        company = vac.get('employer', {}).get('name', '')[:15]
-        btn_text = f"{i+1}. {vac['name'][:35]}{salary_text} • {company}"
-        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"vac_{i}")])
-    
-    keyboard.append([InlineKeyboardButton("🔄 Новый поиск", callback_data="new_search")])
+    keyboard = build_vacancy_keyboard(vacancies, page)
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
-        "Нажми на вакансию для просмотра:",
+        f"Найдено {total} вакансий.\n\nНажми на вакансию:",
         reply_markup=reply_markup
     )
     return STEP_VACANCY
@@ -738,6 +756,7 @@ def main():
                 CallbackQueryHandler(vacancy_selected, pattern=r'^vac_\d+$'),
                 CallbackQueryHandler(vacancy_selected, pattern='^new_search$'),
                 CallbackQueryHandler(vacancy_selected, pattern='^back_search$'),
+                CallbackQueryHandler(vacancy_selected, pattern=r'^page_\d+$'),
                 CallbackQueryHandler(back_to_list, pattern='^back_to_list$'),
                 CallbackQueryHandler(generate_cover_letter, pattern='^gen_cover$'),
                 CallbackQueryHandler(adapt_resume, pattern='^adapt_resume$'),
