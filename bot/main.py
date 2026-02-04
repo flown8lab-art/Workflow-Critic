@@ -104,7 +104,7 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'text': query,
             'per_page': 10,
             'page': 0,
-            'only_with_salary': 'true'
+            'area': 113  # 113 = Россия
         }
         
         response = requests.get(
