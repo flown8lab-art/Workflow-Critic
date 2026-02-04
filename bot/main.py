@@ -240,29 +240,40 @@ async def search_vacancies(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         user_data_store[user_id]['vacancies'] = vacancies
         
-        keyboard = []
+        vacancy_list = []
         for i, vac in enumerate(vacancies[:10]):
             salary_text = ""
             if vac.get('salary'):
                 sal = vac['salary']
                 if sal.get('from') and sal.get('to'):
-                    salary_text = f" | {sal['from']//1000}k-{sal['to']//1000}k"
+                    salary_text = f" ({sal['from']//1000}k-{sal['to']//1000}k)"
                 elif sal.get('from'):
-                    salary_text = f" | от {sal['from']//1000}k"
+                    salary_text = f" (от {sal['from']//1000}k)"
                 elif sal.get('to'):
-                    salary_text = f" | до {sal['to']//1000}k"
+                    salary_text = f" (до {sal['to']//1000}k)"
             
-            company = vac.get('employer', {}).get('name', '')[:15]
-            button_text = f"{vac['name'][:25]}{salary_text}"
-            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"vac_{i}")])
+            company = vac.get('employer', {}).get('name', '')[:20]
+            vacancy_list.append(f"{i+1}. {vac['name']}{salary_text}\n   📍 {company}")
+        
+        vacancy_text = "\n\n".join(vacancy_list)
+        
+        keyboard = []
+        row = []
+        for i in range(min(10, len(vacancies))):
+            row.append(InlineKeyboardButton(str(i+1), callback_data=f"vac_{i}"))
+            if len(row) == 5:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
         
         keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            f"Найдено {data.get('found', 0)} вакансий за последние 2 недели.\n"
-            f"Показаны первые {min(10, len(vacancies))}:\n\n"
-            "Выбери вакансию:",
+            f"Найдено {data.get('found', 0)} вакансий за 2 недели.\n\n"
+            f"{vacancy_text}\n\n"
+            "Выбери номер вакансии:",
             reply_markup=reply_markup
         )
         return STEP_VACANCY
@@ -605,26 +616,38 @@ async def back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     vacancies = user_data_store[user_id]['vacancies']
     
-    keyboard = []
+    vacancy_list = []
     for i, vac in enumerate(vacancies[:10]):
         salary_text = ""
         if vac.get('salary'):
             sal = vac['salary']
             if sal.get('from') and sal.get('to'):
-                salary_text = f" | {sal['from']//1000}k-{sal['to']//1000}k"
+                salary_text = f" ({sal['from']//1000}k-{sal['to']//1000}k)"
             elif sal.get('from'):
-                salary_text = f" | от {sal['from']//1000}k"
+                salary_text = f" (от {sal['from']//1000}k)"
             elif sal.get('to'):
-                salary_text = f" | до {sal['to']//1000}k"
+                salary_text = f" (до {sal['to']//1000}k)"
         
-        button_text = f"{vac['name'][:25]}{salary_text}"
-        keyboard.append([InlineKeyboardButton(button_text, callback_data=f"vac_{i}")])
+        company = vac.get('employer', {}).get('name', '')[:20]
+        vacancy_list.append(f"{i+1}. {vac['name']}{salary_text}\n   📍 {company}")
+    
+    vacancy_text = "\n\n".join(vacancy_list)
+    
+    keyboard = []
+    row = []
+    for i in range(min(10, len(vacancies))):
+        row.append(InlineKeyboardButton(str(i+1), callback_data=f"vac_{i}"))
+        if len(row) == 5:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
     
     keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
-        "Выбери другую вакансию:",
+        f"{vacancy_text}\n\nВыбери номер вакансии:",
         reply_markup=reply_markup
     )
     return STEP_VACANCY
