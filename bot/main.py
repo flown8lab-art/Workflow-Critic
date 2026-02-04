@@ -427,7 +427,9 @@ async def generate_cover_letter(update: Update, context: ContextTypes.DEFAULT_TY
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://replit.com",
+                    "X-Title": "HH Resume Helper"
                 },
                 json={
                     "model": "openai/gpt-4o-mini",
@@ -437,6 +439,13 @@ async def generate_cover_letter(update: Update, context: ContextTypes.DEFAULT_TY
                 timeout=aiohttp.ClientTimeout(total=60)
             ) as response:
                 result = await response.json()
+        
+        if 'error' in result:
+            raise Exception(f"API: {result['error'].get('message', result['error'])}")
+        
+        if 'choices' not in result or not result['choices']:
+            logger.error(f"Unexpected API response: {result}")
+            raise Exception("Неожиданный ответ API")
         
         cover_letter = result['choices'][0]['message']['content']
         
@@ -513,7 +522,9 @@ async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://replit.com",
+                    "X-Title": "HH Resume Helper"
                 },
                 json={
                     "model": "openai/gpt-4o-mini",
@@ -523,6 +534,13 @@ async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 timeout=aiohttp.ClientTimeout(total=60)
             ) as response:
                 result = await response.json()
+        
+        if 'error' in result:
+            raise Exception(f"API: {result['error'].get('message', result['error'])}")
+        
+        if 'choices' not in result or not result['choices']:
+            logger.error(f"Unexpected API response: {result}")
+            raise Exception("Неожиданный ответ API")
         
         recommendations = result['choices'][0]['message']['content']
         
