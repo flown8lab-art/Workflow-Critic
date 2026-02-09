@@ -5,3 +5,16 @@ dist
 .env
 .env.local
 .env.*.local
+
+# IDE
+.vscode/
+Untitled
+
+# Runtime data
+bot/stats.json
+bot/telegram_vacancies.json
+
+# Python
+__pycache__/
+*.pyc
+.env
