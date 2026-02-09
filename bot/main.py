@@ -6,12 +6,13 @@ import asyncio
 import aiohttp
 import requests
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
+    PreCheckoutQueryHandler,
     ConversationHandler,
     ContextTypes,
     filters
@@ -37,6 +38,16 @@ TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
 
+# Telegram Stars (XTR) — оплата цифровых товаров, provider_token пустой
+STARS_COVER = 5
+STARS_ADAPT = 5
+PAYMENT_CURRENCY = "XTR"
+PAYMENT_PROVIDER_TOKEN = ""
+
+# Демо-лимиты бесплатных действий
+FREE_COVER_LIMIT = 1
+FREE_ADAPT_LIMIT = 1
+
 STEP_START, STEP_RESUME, STEP_PREFERENCES, STEP_SEARCH, STEP_VACANCY = range(5)
 
 user_data_store = {}
@@ -49,9 +60,13 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 def load_stats():
     try:
         with open(STATS_FILE, 'r') as f:
-            return json.load(f)
+            stats = json.load(f)
+            # Инициализация free_usage если отсутствует
+            if 'free_usage' not in stats:
+                stats['free_usage'] = {}
+            return stats
     except:
-        return {'users': [], 'total_searches': 0}
+        return {'users': [], 'total_searches': 0, 'free_usage': {}}
 
 def save_stats(stats):
     try:
@@ -59,6 +74,36 @@ def save_stats(stats):
             json.dump(stats, f)
     except Exception as e:
         logger.error(f"Error saving stats: {e}")
+
+def can_use_free(user_id: int, action_type: str) -> bool:
+    """Проверяет, может ли пользователь использовать бесплатное действие."""
+    stats = load_stats()
+    free_usage = stats.get('free_usage', {})
+    user_usage = free_usage.get(str(user_id), {})
+    
+    if action_type == 'cover':
+        used = user_usage.get('cover', 0)
+        return used < FREE_COVER_LIMIT
+    elif action_type == 'adapt':
+        used = user_usage.get('adapt', 0)
+        return used < FREE_ADAPT_LIMIT
+    return False
+
+def mark_free_used(user_id: int, action_type: str):
+    """Отмечает использование бесплатного действия пользователем."""
+    stats = load_stats()
+    if 'free_usage' not in stats:
+        stats['free_usage'] = {}
+    free_usage = stats['free_usage']
+    
+    user_id_str = str(user_id)
+    if user_id_str not in free_usage:
+        free_usage[user_id_str] = {'cover': 0, 'adapt': 0}
+    
+    if action_type in ('cover', 'adapt'):
+        free_usage[user_id_str][action_type] = free_usage[user_id_str].get(action_type, 0) + 1
+    
+    save_stats(stats)
 
 def track_user(user_id: int):
     stats = load_stats()
@@ -650,36 +695,19 @@ async def vacancy_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return STEP_VACANCY
 
 
-async def generate_cover_letter(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = update.effective_user.id
-    
-    if user_id not in user_data_store:
-        await query.edit_message_text("Сессия истекла. Начни заново: /start")
-        return ConversationHandler.END
-    
-    resume = user_data_store[user_id].get('resume')
-    vacancy = user_data_store[user_id].get('current_vacancy')
-    
-    if not resume:
-        await query.edit_message_text("Резюме не найдено. Начни заново: /start")
-        return ConversationHandler.END
-    
-    if not vacancy:
-        await query.edit_message_text("Вакансия не выбрана. Начни заново: /start")
-        return ConversationHandler.END
-    
-    await query.edit_message_text("Генерирую сопроводительное письмо (10-20 сек)...")
-    
-    description = vacancy.get('description', '')
+async def _execute_cover_generation(context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    """Генерация сопроводительного письма (вызывается после успешной оплаты)."""
     from html import unescape
     import re
+    resume = user_data_store[user_id].get('resume')
+    vacancy = user_data_store[user_id].get('current_vacancy')
+    if not resume or not vacancy:
+        await context.bot.send_message(chat_id=user_id, text="Данные не найдены. Начни заново: /start")
+        return
+    description = vacancy.get('description', '')
     description = re.sub(r'<[^>]+>', ' ', description)
     description = unescape(description)
     description = ' '.join(description.split())[:2000]
-    
     prompt = f"""Напиши сопроводительное письмо на русском языке. Пиши простым человеческим языком, как будто пишет живой человек, а не робот.
 
 ВАКАНСИЯ:
@@ -701,7 +729,6 @@ async def generate_cover_letter(update: Update, context: ContextTypes.DEFAULT_TY
 8. Тон: уверенный, но не высокомерный. Деловой, но человечный.
 
 Напиши только текст письма, без заголовков и подписей."""
-
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -720,81 +747,46 @@ async def generate_cover_letter(update: Update, context: ContextTypes.DEFAULT_TY
                 timeout=aiohttp.ClientTimeout(total=60)
             ) as response:
                 result = await response.json()
-        
         if 'error' in result:
             raise Exception(f"API: {result['error'].get('message', result['error'])}")
-        
         if 'choices' not in result or not result['choices']:
-            logger.error(f"Unexpected API response: {result}")
             raise Exception("Неожиданный ответ API")
-        
         cover_letter = result['choices'][0]['message']['content']
-        
         await context.bot.send_message(
             chat_id=user_id,
             text=f"**Сопроводительное письмо:**\n\n{cover_letter}",
             parse_mode='Markdown'
         )
-        
         vacancies = user_data_store[user_id].get('vacancies', [])
         current_idx = user_data_store[user_id].get('current_vacancy_index', 0)
-        
         keyboard = []
         if current_idx + 1 < len(vacancies[:10]):
             keyboard.append([InlineKeyboardButton(f"➡️ Следующая ({current_idx + 2} из {len(vacancies)})", callback_data=f"vac_{current_idx + 1}")])
         keyboard.append([InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")])
         keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Ссылка: {vacancy.get('alternate_url', '')}\n\n"
-                 "Скопируй письмо и отправь на hh.ru",
-            reply_markup=reply_markup
+            text=f"Ссылка: {vacancy.get('alternate_url', '')}\n\nСкопируй письмо и отправь на hh.ru",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        return STEP_VACANCY
-        
     except Exception as e:
         logger.error(f"Error generating cover letter: {e}")
-        keyboard = [
-            [InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")],
-            [InlineKeyboardButton("Новый поиск", callback_data="new_search")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"Ошибка генерации: {str(e)}",
-            reply_markup=reply_markup
-        )
-        return STEP_VACANCY
+        await context.bot.send_message(chat_id=user_id, text=f"Ошибка генерации: {str(e)}")
 
 
-async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = update.effective_user.id
-    
-    if user_id not in user_data_store:
-        await query.edit_message_text("Сессия истекла. Начни заново: /start")
-        return ConversationHandler.END
-    
-    resume = user_data_store[user_id].get('resume')
-    vacancy = user_data_store[user_id].get('current_vacancy')
-    
-    if not resume or not vacancy:
-        await query.edit_message_text("Данные не найдены. Начни заново: /start")
-        return ConversationHandler.END
-    
-    await query.edit_message_text("Анализирую и адаптирую резюме (10-20 сек)...")
-    
-    description = vacancy.get('description', '')
+async def _execute_adapt_resume(context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    """Адаптация резюме под вакансию (вызывается после успешной оплаты)."""
     from html import unescape
     import re
+    resume = user_data_store[user_id].get('resume')
+    vacancy = user_data_store[user_id].get('current_vacancy')
+    if not resume or not vacancy:
+        await context.bot.send_message(chat_id=user_id, text="Данные не найдены. Начни заново: /start")
+        return
+    description = vacancy.get('description', '')
     description = re.sub(r'<[^>]+>', ' ', description)
     description = unescape(description)
     description = ' '.join(description.split())[:2000]
-    
     prompt = f"""Ты редактор резюме. Дай КОНКРЕТНЫЕ правки для адаптации этого резюме под вакансию.
 
 ВАКАНСИЯ:
@@ -816,7 +808,7 @@ async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 2. В разделе "Навыки":
    ДОБАВИТЬ: [конкретный навык из требований вакансии]
-   
+
 3. В разделе "О себе" / "Цель":
    БЫЛО: "[цитата]"
    СТАЛО: "[новая версия]"
@@ -826,7 +818,6 @@ async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - [слово 2] — вставить в [конкретный раздел]
 
 Дай 3-5 конкретных правок. Цитируй реальные фразы из резюме пользователя."""
-
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -845,52 +836,126 @@ async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 timeout=aiohttp.ClientTimeout(total=60)
             ) as response:
                 result = await response.json()
-        
         if 'error' in result:
             raise Exception(f"API: {result['error'].get('message', result['error'])}")
-        
         if 'choices' not in result or not result['choices']:
-            logger.error(f"Unexpected API response: {result}")
             raise Exception("Неожиданный ответ API")
-        
         recommendations = result['choices'][0]['message']['content']
-        
         await context.bot.send_message(
             chat_id=user_id,
             text=f"**Рекомендации по адаптации резюме:**\n\n{recommendations}",
             parse_mode='Markdown'
         )
-        
         vacancies = user_data_store[user_id].get('vacancies', [])
         current_idx = user_data_store[user_id].get('current_vacancy_index', 0)
-        
         keyboard = []
         if current_idx + 1 < len(vacancies[:10]):
             keyboard.append([InlineKeyboardButton(f"➡️ Следующая ({current_idx + 2} из {len(vacancies)})", callback_data=f"vac_{current_idx + 1}")])
         keyboard.append([InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")])
         keyboard.append([InlineKeyboardButton("Новый поиск", callback_data="new_search")])
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
         await context.bot.send_message(
             chat_id=user_id,
             text="Что дальше?",
-            reply_markup=reply_markup
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        return STEP_VACANCY
-        
     except Exception as e:
         logger.error(f"Error adapting resume: {e}")
-        keyboard = [
-            [InlineKeyboardButton("Назад к списку вакансий", callback_data="back_to_list")],
-            [InlineKeyboardButton("Новый поиск", callback_data="new_search")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"Ошибка анализа: {str(e)}",
-            reply_markup=reply_markup
-        )
+        await context.bot.send_message(chat_id=user_id, text=f"Ошибка анализа: {str(e)}")
+
+
+async def generate_cover_letter(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    if user_id not in user_data_store:
+        await query.edit_message_text("Сессия истекла. Начни заново: /start")
+        return ConversationHandler.END
+    resume = user_data_store[user_id].get('resume')
+    vacancy = user_data_store[user_id].get('current_vacancy')
+    if not resume:
+        await query.edit_message_text("Резюме не найдено. Начни заново: /start")
+        return ConversationHandler.END
+    if not vacancy:
+        await query.edit_message_text("Вакансия не выбрана. Начни заново: /start")
+        return ConversationHandler.END
+    
+    # Проверка бесплатного лимита
+    if can_use_free(user_id, 'cover'):
+        mark_free_used(user_id, 'cover')
+        await query.edit_message_text("Генерирую сопроводительное письмо (10-20 сек)...")
+        await _execute_cover_generation(context, user_id)
         return STEP_VACANCY
+    
+    # Лимит исчерпан - отправляем invoice
+    await query.edit_message_text("Ниже счёт на оплату. После оплаты письмо придёт в этот чат.")
+    await context.bot.send_invoice(
+        chat_id=user_id,
+        title="Сопроводительное письмо (AI)",
+        description="Генерация сопроводительного письма под выбранную вакансию",
+        payload="cover",
+        provider_token=PAYMENT_PROVIDER_TOKEN,
+        currency=PAYMENT_CURRENCY,
+        prices=[LabeledPrice(label="Сопроводительное письмо", amount=STARS_COVER)]
+    )
+    return STEP_VACANCY
+
+
+async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    if user_id not in user_data_store:
+        await query.edit_message_text("Сессия истекла. Начни заново: /start")
+        return ConversationHandler.END
+    resume = user_data_store[user_id].get('resume')
+    vacancy = user_data_store[user_id].get('current_vacancy')
+    if not resume or not vacancy:
+        await query.edit_message_text("Данные не найдены. Начни заново: /start")
+        return ConversationHandler.END
+    
+    # Проверка бесплатного лимита
+    if can_use_free(user_id, 'adapt'):
+        mark_free_used(user_id, 'adapt')
+        await query.edit_message_text("Анализирую и адаптирую резюме (10-20 сек)...")
+        await _execute_adapt_resume(context, user_id)
+        return STEP_VACANCY
+    
+    # Лимит исчерпан - отправляем invoice
+    await query.edit_message_text("Ниже счёт на оплату. После оплаты рекомендации придут в этот чат.")
+    await context.bot.send_invoice(
+        chat_id=user_id,
+        title="Адаптация резюме (AI)",
+        description="Рекомендации по адаптации резюме под выбранную вакансию в формате БЫЛО/СТАЛО",
+        payload="adapt",
+        provider_token=PAYMENT_PROVIDER_TOKEN,
+        currency=PAYMENT_CURRENCY,
+        prices=[LabeledPrice(label="Адаптация резюме", amount=STARS_ADAPT)]
+    )
+    return STEP_VACANCY
+
+
+async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.pre_checkout_query
+    payload = (query.invoice_payload or "").strip()
+    if payload not in ("cover", "adapt"):
+        await query.answer(ok=False, error_message="Неизвестный тип оплаты. Начни заново: /start")
+        return
+    await query.answer(ok=True)
+
+
+async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.successful_payment:
+        return
+    user_id = update.effective_user.id
+    payload = (update.message.successful_payment.invoice_payload or "").strip()
+    if payload == "cover":
+        await update.message.reply_text("Оплата получена. Генерирую письмо (10–20 сек)...")
+        await _execute_cover_generation(context, user_id)
+    elif payload == "adapt":
+        await update.message.reply_text("Оплата получена. Анализирую резюме (10–20 сек)...")
+        await _execute_adapt_resume(context, user_id)
+    else:
+        await update.message.reply_text("Оплата зачислена. Если ожидался другой результат — напиши в поддержку.")
 
 
 async def back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -998,6 +1063,8 @@ def main():
     application.add_handler(CommandHandler('help', help_command))
     application.add_handler(CommandHandler('stats', stats_command))
     application.add_handler(CommandHandler('myid', myid_command))
+    application.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
     
     logger.info("Bot starting...")
     
