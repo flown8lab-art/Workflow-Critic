@@ -5,6 +5,8 @@ import logging
 import asyncio
 import aiohttp
 import requests
+from telegram import LabeledPrice, Update
+from telegram.ext import CommandHandler, PreCheckoutQueryHandler, MessageHandler, ContextTypes, filters
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
@@ -37,18 +39,23 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
+ADMIN_IDS = [394363189]  # Список ID администраторов
 
 # Telegram Stars (XTR) — оплата цифровых товаров, provider_token пустой
 STARS_COVER = 5
 STARS_ADAPT = 5
 PAYMENT_CURRENCY = "XTR"
-PAYMENT_PROVIDER_TOKEN = ""
+PAYMENT_PROVIDER_TOKEN = ""  # ОСТАВЬ ПУСТЫМ для Telegram Stars
+PRICE_STARS = 100  # 100 Stars для платного доступа
 
 # Демо-лимиты бесплатных действий
 FREE_COVER_LIMIT = 1
 FREE_ADAPT_LIMIT = 1
 
 STEP_START, STEP_RESUME, STEP_PREFERENCES, STEP_SEARCH, STEP_VACANCY = range(5)
+
+# Хранилище пользователей
+users = {}
 
 user_data_store = {}
 STATS_FILE = 'bot/stats.json'
@@ -118,29 +125,32 @@ def track_search():
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    track_user(user_id)
-    user_data_store[user_id] = {
-        'resume': None,
-        'preferences': {},
-        'vacancies': [],
-        'current_vacancy': None,
-        'current_vacancy_index': 0
-    }
+    # ВРЕМЕННО: тестовое сообщение
+    await update.message.reply_text("Привет-тест2")
+    return ConversationHandler.END
     
-    await update.message.reply_text(
-        "Привет! Я помогу найти работу на hh.ru и подготовить отклик.\n\n"
-        "Давай начнём пошагово:\n\n"
-        "**Шаг 1 из 3**: Загрузи своё резюме\n"
-        "Отправь файл (PDF, Word) или текст резюме.",
-        parse_mode='Markdown'
-    )
-    return STEP_RESUME
+    # Оригинальный код (закомментирован для теста):
+    # user_id = update.effective_user.id
+    # track_user(user_id)
+    # user_data_store[user_id] = {
+    #     'resume': None,
+    #     'preferences': {},
+    #     'vacancies': [],
+    #     'current_vacancy': None,
+    #     'current_vacancy_index': 0
+    # }
+    # 
+    # await update.message.reply_text(
+    #     "Привет! Я помогу найти работу на hh.ru и подготовить отклик.\n\n"
+    #     "Давай начнём пошагово:\n\n"
+    #     "**Шаг 1 из 3**: Загрузи своё резюме\n"
+    #     "Отправь файл (PDF, Word) или текст резюме.",
+    #     parse_mode='Markdown'
+    # )
+    # return STEP_RESUME
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if ADMIN_ID and user_id != ADMIN_ID:
-        await update.message.reply_text("Эта команда только для администратора.")
+    if update.effective_user.id not in ADMIN_IDS:
         return
     
     stats = load_stats()
@@ -934,28 +944,67 @@ async def adapt_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return STEP_VACANCY
 
 
-async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда покупки платного доступа через Telegram Stars."""
+    logger.info("BUY COMMAND TRIGGERED")
+    
+    prices = [LabeledPrice("Доступ", 100)]
+    
+    await context.bot.send_invoice(
+        chat_id=update.effective_chat.id,
+        title="Премиум доступ",
+        description="Полный доступ",
+        payload="paid_access",
+        provider_token="",
+        currency="XTR",
+        prices=prices,
+    )
+
+
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик pre-checkout с логированием для отладки."""
+    print("PRECHECKOUT TRIGGERED")
     query = update.pre_checkout_query
     payload = (query.invoice_payload or "").strip()
-    if payload not in ("cover", "adapt"):
-        await query.answer(ok=False, error_message="Неизвестный тип оплаты. Начни заново: /start")
-        return
+    logger.info(f"Pre-checkout query received: payload={payload}")
     await query.answer(ok=True)
 
 
-async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик успешной оплаты."""
     if not update.message or not update.message.successful_payment:
         return
+    payment = update.message.successful_payment
     user_id = update.effective_user.id
-    payload = (update.message.successful_payment.invoice_payload or "").strip()
+    payload = (payment.invoice_payload or "").strip()
+    
+    logger.info(f"Successful payment received: user_id={user_id}, payload={payload}")
+    
     if payload == "cover":
         await update.message.reply_text("Оплата получена. Генерирую письмо (10–20 сек)...")
         await _execute_cover_generation(context, user_id)
     elif payload == "adapt":
         await update.message.reply_text("Оплата получена. Анализирую резюме (10–20 сек)...")
         await _execute_adapt_resume(context, user_id)
+    elif payload == "HR_ANALYSIS_100":
+        # TODO: сохранить user_id + payment.invoice_payload в БД
+        await update.message.reply_text("✅ Оплата прошла успешно! Доступ активирован.")
+    elif payload == "paid_access":
+        users[user_id] = {"paid": True}
+        await update.message.reply_text("Оплата прошла успешно. Доступ открыт.")
     else:
         await update.message.reply_text("Оплата зачислена. Если ожидался другой результат — напиши в поддержку.")
+
+
+async def premium_feature(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Пример премиум-функции с проверкой доступа."""
+    user_id = update.effective_user.id
+    
+    if user_id not in users or not users[user_id].get("paid"):
+        await update.message.reply_text("Доступ только для оплативших. Используй /buy")
+        return
+    
+    await update.message.reply_text("Вот премиум-функция")
 
 
 async def back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1010,12 +1059,42 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+async def debug_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отладочный обработчик для всех callback'ов."""
+    query = update.callback_query
+    await query.answer()
+    print("CALLBACK DATA:", query.data)
+
+
+async def run_parser_periodically():
+    """Run telegram parser every 12 hours"""
+    await asyncio.sleep(120)
+    while True:
+        try:
+            logger.info("Starting scheduled parser run...")
+            import subprocess
+            result = subprocess.run(
+                ['python3', 'bot/telegram_parser.py'],
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            if result.returncode == 0:
+                logger.info("Parser completed successfully")
+            else:
+                logger.error(f"Parser error: {result.stderr}")
+        except Exception as e:
+            logger.error(f"Parser exception: {e}")
+        await asyncio.sleep(12 * 60 * 60)
+
 async def post_init(application):
     await application.bot.set_my_commands([
         ("start", "Начать поиск работы"),
         ("help", "Справка и возможности"),
         ("cancel", "Отменить текущий поиск")
     ])
+    # Запуск фоновой задачи парсера
+    asyncio.create_task(run_parser_periodically())
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
@@ -1059,45 +1138,29 @@ def main():
         allow_reentry=True
     )
     
-    application.add_handler(conv_handler)
-    application.add_handler(CommandHandler('help', help_command))
-    application.add_handler(CommandHandler('stats', stats_command))
-    application.add_handler(CommandHandler('myid', myid_command))
-    application.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
-    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
+   # ===== ПЛАТЕЖИ (САМЫЙ ВЫСОКИЙ ПРИОРИТЕТ) =====
+    logger.info("REGISTERING BUY HANDLER")
+    application.add_handler(CommandHandler("buy", buy_command), group=0)
+    application.add_handler(PreCheckoutQueryHandler(precheckout_callback), group=0)
+    application.add_handler(
+        MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback),
+        group=0
+    )
     
+    # ===== DEBUG CALLBACK HANDLER (ПЕРВЫМ) =====
+    application.add_handler(CallbackQueryHandler(debug_callback), group=0)
+
+    # ===== ПРОСТЫЕ КОМАНДЫ =====
+    application.add_handler(CommandHandler("help", help_command), group=1)
+    application.add_handler(CommandHandler("stats", stats_command), group=1)
+    application.add_handler(CommandHandler("myid", myid_command), group=1)
+    application.add_handler(CommandHandler("premium", premium_feature), group=1)
+
+    # ===== DIALOG FLOW =====
+    application.add_handler(conv_handler, group=1)
+
     logger.info("Bot starting...")
-    
-    async def run_parser_periodically():
-        """Run telegram parser every 12 hours"""
-        await asyncio.sleep(120)
-        while True:
-            try:
-                logger.info("Starting scheduled parser run...")
-                import subprocess
-                result = subprocess.run(
-                    ['python', 'bot/telegram_parser.py'],
-                    capture_output=True,
-                    text=True,
-                    timeout=300
-                )
-                if result.returncode == 0:
-                    logger.info("Parser completed successfully")
-                else:
-                    logger.error(f"Parser error: {result.stderr}")
-            except Exception as e:
-                logger.error(f"Parser exception: {e}")
-            await asyncio.sleep(12 * 60 * 60)
-    
-    async def run_bot():
-        async with application:
-            await application.initialize()
-            await application.start()
-            asyncio.create_task(run_parser_periodically())
-            await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-            await asyncio.Event().wait()
-    
-    asyncio.run(run_bot())
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == '__main__':
