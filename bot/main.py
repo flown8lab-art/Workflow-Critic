@@ -125,29 +125,24 @@ def track_search():
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ВРЕМЕННО: тестовое сообщение
-    await update.message.reply_text("Привет-тест2")
-    return ConversationHandler.END
+    user_id = update.effective_user.id
+    track_user(user_id)
+    user_data_store[user_id] = {
+        'resume': None,
+        'preferences': {},
+        'vacancies': [],
+        'current_vacancy': None,
+        'current_vacancy_index': 0
+    }
     
-    # Оригинальный код (закомментирован для теста):
-    # user_id = update.effective_user.id
-    # track_user(user_id)
-    # user_data_store[user_id] = {
-    #     'resume': None,
-    #     'preferences': {},
-    #     'vacancies': [],
-    #     'current_vacancy': None,
-    #     'current_vacancy_index': 0
-    # }
-    # 
-    # await update.message.reply_text(
-    #     "Привет! Я помогу найти работу на hh.ru и подготовить отклик.\n\n"
-    #     "Давай начнём пошагово:\n\n"
-    #     "**Шаг 1 из 3**: Загрузи своё резюме\n"
-    #     "Отправь файл (PDF, Word) или текст резюме.",
-    #     parse_mode='Markdown'
-    # )
-    # return STEP_RESUME
+    await update.message.reply_text(
+        "Привет! Я помогу найти работу на hh.ru и подготовить отклик.\n\n"
+        "Давай начнём пошагово:\n\n"
+        "**Шаг 1 из 3**: Загрузи своё резюме\n"
+        "Отправь файл (PDF, Word) или текст резюме.",
+        parse_mode='Markdown'
+    )
+    return STEP_RESUME
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
@@ -1097,6 +1092,7 @@ async def post_init(application):
     asyncio.create_task(run_parser_periodically())
 
 def main():
+    print("SERVER TEST 14 FEB")
     if not TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN not set!")
         return
