@@ -1052,6 +1052,15 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+async def callback_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик для нажатий кнопок, когда диалог не активен (сессия истекла или бот перезапущен)."""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "Сессия истекла или бот был перезапущен. Введи /start чтобы начать заново."
+    )
+
+
 async def run_parser_periodically():
     """Run telegram parser every 12 hours"""
     await asyncio.sleep(120)
@@ -1141,8 +1150,13 @@ def main():
     # ===== DIALOG FLOW =====
     application.add_handler(conv_handler, group=1)
 
+    # Обработчик нажатий кнопок вне диалога (group=2 — после conv_handler)
+    application.add_handler(CallbackQueryHandler(callback_fallback), group=2)
+
     logger.info("Bot starting...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    application.run_polling(
+        allowed_updates=[Update.MESSAGE, Update.CALLBACK_QUERY, Update.PRE_CHECKOUT_QUERY, Update.CHAT_MIGRATION]
+    )
 
 
 if __name__ == '__main__':
