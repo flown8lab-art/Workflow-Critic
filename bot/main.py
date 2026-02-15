@@ -5,8 +5,6 @@ import logging
 import asyncio
 import aiohttp
 import requests
-from telegram import LabeledPrice, Update
-from telegram.ext import CommandHandler, PreCheckoutQueryHandler, MessageHandler, ContextTypes, filters
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
@@ -1054,13 +1052,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-async def debug_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отладочный обработчик для всех callback'ов."""
-    query = update.callback_query
-    await query.answer()
-    print("CALLBACK DATA:", query.data)
-
-
 async def run_parser_periodically():
     """Run telegram parser every 12 hours"""
     await asyncio.sleep(120)
@@ -1092,7 +1083,6 @@ async def post_init(application):
     asyncio.create_task(run_parser_periodically())
 
 def main():
-    print("SERVER TEST 14 FEB")
     if not TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN not set!")
         return
@@ -1135,16 +1125,12 @@ def main():
     )
     
    # ===== ПЛАТЕЖИ (САМЫЙ ВЫСОКИЙ ПРИОРИТЕТ) =====
-    logger.info("REGISTERING BUY HANDLER")
     application.add_handler(CommandHandler("buy", buy_command), group=0)
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback), group=0)
     application.add_handler(
         MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback),
         group=0
     )
-    
-    # ===== DEBUG CALLBACK HANDLER (ПЕРВЫМ) =====
-    application.add_handler(CallbackQueryHandler(debug_callback), group=0)
 
     # ===== ПРОСТЫЕ КОМАНДЫ =====
     application.add_handler(CommandHandler("help", help_command), group=1)
