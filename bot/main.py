@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 import os
 import io
 import json
@@ -6,6 +7,8 @@ import asyncio
 import aiohttp
 import requests
 from datetime import datetime
+
+load_dotenv()
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
@@ -34,9 +37,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
-ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 ADMIN_IDS = [394363189]  # Список ID администраторов
 
 # Telegram Stars (XTR) — оплата цифровых товаров, provider_token пустой
@@ -1092,15 +1095,21 @@ async def post_init(application):
     asyncio.create_task(run_parser_periodically())
 
 def main():
-    if not TELEGRAM_BOT_TOKEN:
+    if not TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN not set!")
+        logger.error("Проверьте файл .env и убедитесь, что TELEGRAM_BOT_TOKEN установлен")
         return
     
     if not OPENROUTER_API_KEY:
         logger.error("OPENROUTER_API_KEY not set!")
+        logger.error("Проверьте файл .env и убедитесь, что OPENROUTER_API_KEY установлен")
         return
     
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
+    try:
+        application = Application.builder().token(TOKEN).post_init(post_init).build()
+    except Exception as e:
+        logger.error(f"Ошибка при создании Application: {e}")
+        return
     
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
@@ -1154,10 +1163,22 @@ def main():
     application.add_handler(CallbackQueryHandler(callback_fallback), group=2)
 
     logger.info("Bot starting...")
-    application.run_polling(
-        allowed_updates=[Update.MESSAGE, Update.CALLBACK_QUERY, Update.PRE_CHECKOUT_QUERY, Update.CHAT_MIGRATION]
-    )
+    logger.info(f"TOKEN loaded: {'Yes' if TOKEN else 'No'}")
+    logger.info(f"OPENROUTER_API_KEY loaded: {'Yes' if OPENROUTER_API_KEY else 'No'}")
+    
+    try:
+        logger.info("Starting run_polling()...")
+        application.run_polling(
+            allowed_updates=[Update.MESSAGE, Update.CALLBACK_QUERY, Update.PRE_CHECKOUT_QUERY, Update.CHAT_MIGRATION],
+            drop_pending_updates=True
+        )
+        logger.info("run_polling() completed (this should not happen normally)")
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    except Exception as e:
+        logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
+        raise
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
