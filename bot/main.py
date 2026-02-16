@@ -1151,6 +1151,7 @@ def main():
     )
 
     # ===== ПРОСТЫЕ КОМАНДЫ =====
+    application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command), group=1)
     application.add_handler(CommandHandler("stats", stats_command), group=1)
     application.add_handler(CommandHandler("myid", myid_command), group=1)
@@ -1169,7 +1170,7 @@ def main():
     try:
         logger.info("Starting run_polling()...")
         application.run_polling(
-            allowed_updates=[Update.MESSAGE, Update.CALLBACK_QUERY, Update.PRE_CHECKOUT_QUERY, Update.CHAT_MIGRATION],
+            application.run_polling()
             drop_pending_updates=True
         )
         logger.info("run_polling() completed (this should not happen normally)")
